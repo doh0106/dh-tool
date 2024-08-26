@@ -1,0 +1,61 @@
+import pandas as pd
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from .observer import Observer
+
+
+class VisualizationHandler(Observer):
+    def __init__(self):
+        super().__init__()
+        self.df = None
+
+    def update(self, dataframe):
+        self.df = dataframe
+
+    def plot_histogram(self, column, bins=10, title=None):
+        plt.figure(figsize=(10, 6))
+        sns.histplot(self.df[column], bins=bins)
+        plt.title(title if title else f"Histogram of {column}")
+        plt.xlabel(column)
+        plt.ylabel("Frequency")
+        plt.show()
+
+    def plot_boxplot(self, column, by=None, title=None):
+        plt.figure(figsize=(10, 6))
+        sns.boxplot(x=by, y=column, data=self.df)
+        plt.title(title if title else f"Boxplot of {column}")
+        plt.xlabel(by if by else "Category")
+        plt.ylabel(column)
+        plt.show()
+
+    def plot_scatter(self, x, y, hue=None, title=None):
+        plt.figure(figsize=(10, 6))
+        sns.scatterplot(x=x, y=y, hue=hue, data=self.df)
+        plt.title(title if title else f"Scatter Plot of {x} vs {y}")
+        plt.xlabel(x)
+        plt.ylabel(y)
+        plt.show()
+
+    def plot_heatmap(self, title=None):
+        plt.figure(figsize=(12, 8))
+        sns.heatmap(self.df.corr(), annot=True, fmt=".2f", cmap="coolwarm")
+        plt.title(title if title else "Correlation Heatmap")
+        plt.show()
+
+    def plot_bar(self, x, y, hue=None, title=None):
+        plt.figure(figsize=(10, 6))
+        sns.barplot(x=x, y=y, hue=hue, data=self.df)
+        plt.title(title if title else f"Bar Plot of {x} vs {y}")
+        plt.xlabel(x)
+        plt.ylabel(y)
+        plt.show()
+
+    def plot_line(self, x, y, hue=None, title=None):
+        plt.figure(figsize=(10, 6))
+        sns.lineplot(x=x, y=y, hue=hue, data=self.df)
+        plt.title(title if title else f"Line Plot of {x} vs {y}")
+        plt.xlabel(x)
+        plt.ylabel(y)
+        plt.show()
