@@ -1,7 +1,7 @@
 from .common import *
 from .es_tool import ESTool
 from .df import *
-from .file_tool import FileHandler
+from .file_tool import FileHandler as fh
 from .gpt.gpt_tool import GPT
 
 __all__ = [
@@ -9,7 +9,7 @@ __all__ = [
     "DataFrameHandler",
     "ESTool",
     "ExcelHandler",
-    "FileHandler",
+    "fh",
     "Path",
     "datetime",
     "defaultdict",

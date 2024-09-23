@@ -16,32 +16,49 @@ MODEL_PRICE = {
 }
 
 
-
 class GPT:
     def __init__(self, api_key, model) -> None:
         self.client = OpenAI(api_key=api_key)
         openai.api_key = api_key
-        self.instruction = None
-        self.model = model
+        self._instruction: str = None
+        self._model: str = model
         self.model_emb = "text-embedding-3-large"
-        self.params = {
-            "response_format": {"type": "json_object"},
-            "max_tokens": 200,
-            "temperature": 0.9,
+        self._params: dict = {
+            "max_tokens": 1024,
+            "temperature": 0,
             "seed": 0,
         }
 
-    def set_param(self, **kwargs):
-        self.params.update(kwargs)
-        print(f"Now gpt_params : {self.params}")
+    @property
+    def params(self) -> dict:
+        return self._params
 
-    def set_instruction(self, instruction):
-        self.instruction = instruction
-        print("Instruction is set")
+    @params.setter
+    def params(self, new_params: dict) -> None:
+        if "max_tokens" in new_params:
+            if new_params["max_tokens"] < 1:
+                raise ValueError("max_tokens must be at least 1")
+            elif new_params["max_tokens"] > 4096:
+                raise ValueError("max_tokens must be at most 4096")
+        self._params.update(new_params)
 
-    def set_model(self, model_name):
-        self.model = model_name
-        print("Model is set to ", self.model)
+    @property
+    def instruction(self) -> str:
+        return self._instruction
+
+    @instruction.setter
+    def instruction(self, new_instruction: str) -> None:
+        self._instruction = new_instruction
+
+    @property
+    def model(self) -> str:
+        return self._model
+
+    @model.setter
+    def model(self, new_model: str) -> None:
+        if new_model not in MODEL_PRICE:
+            raise ValueError(f"model must in {list(MODEL_PRICE.keys())}")
+        self._model = new_model
 
     def chat(self, comment, return_all=False):
         messages = [{"role": "user", "content": comment}]
@@ -90,23 +107,7 @@ class GPT:
         if model_name in MODEL_PRICE:
             token_prices = MODEL_PRICE[model_name]
             return exchange_rate * (
-                prompt_tokens * token_prices[0]
-                + completion_tokens * token_prices[1]
+                prompt_tokens * token_prices[0] + completion_tokens * token_prices[1]
             )
         print(f"{model_name} not in price dict")
         return 0
-
-    # def list_models(self):
-    #     models = self.client.models.list()
-    #     return [model["id"] for model in models["data"]]
-
-    # def summarize(self, text):
-    #     summary_instruction = "Please provide a concise summary of the following text."
-    #     completion = self.client.chat.completions.create(
-    #         model=self.model,
-    #         messages=[
-    #             {"role": "system", "content": summary_instruction},
-    #             {"role": "user", "content": text},
-    #         ],
-    #     )
-    #     return completion.choices[0].message.content
