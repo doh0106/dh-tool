@@ -194,3 +194,4 @@ class ESTool:
             hits = response["hits"]["hits"]
 
         return all_hits
+

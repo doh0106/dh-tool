@@ -1,6 +1,5 @@
 import uuid
 import json
-from pathlib import Path
 import openai
 
 
@@ -14,13 +13,13 @@ class BatchProcessor:
         self.client = openai.OpenAI(api_key=api_key)
 
     @staticmethod
-    def format_batch(custom_id, prompt, **gpt_params):
+    def format_batch(custom_id, prompt, model, **gpt_params):
         batch_format = {
             "custom_id": custom_id,
             "method": "POST",
             "url": "/v1/chat/completions",
             "body": {
-                "model": "gpt-4o",
+                "model": model,
                 "messages": [
                     {"role": "user", "content": prompt},
                 ],
@@ -34,17 +33,40 @@ class BatchProcessor:
         return batch_format
 
     @staticmethod
-    def make_batch(prompts, **gpt_params):
+    def format_struct_batch(custom_id, body):   
+        batch_format = {
+            "custom_id": custom_id,
+            "method": "POST",
+            "url": "/v1/chat/completions",
+            "body": body
+        }
+        return batch_format
+    
+    @staticmethod
+    def make_batch(prompts,custom_ids = None, **gpt_params):
         if isinstance(prompts, str):
             prompts = [prompts]
-        random_uuid = generate_random_uuid()
-        return [
-            BatchProcessor.format_batch(f"{random_uuid}-{idx:04}", prompt, **gpt_params)
-            for idx, prompt in enumerate(prompts, start=1)
-        ]
+        if custom_ids is None:
+            return [
+                BatchProcessor.format_batch(generate_random_uuid(), prompt, **gpt_params)
+                for  prompt in prompts
+            ]
+        else:
+            return [
+                BatchProcessor.format_batch(cid, prompt, **gpt_params) 
+                for cid, prompt in zip(custom_ids, prompts)
+            ]
+        
+    @staticmethod
+    def make_struct_batch(bodies, custom_ids = None):
+        if custom_ids is None:
+            return [BatchProcessor.format_struct_batch(generate_random_uuid(), body)
+                    for body in bodies]
+        else:
+            return [BatchProcessor.format_struct_batch(cid, body)
+                    for cid, body in zip(custom_ids, bodies)]
 
-    def request_batch(self, prompts, meta_data: dict, **gpt_params):
-        batchs = BatchProcessor.make_batch(prompts=prompts, **gpt_params)
+    def request_batch(self, batchs, meta_data: dict):
         batch_str = "\n".join([json.dumps(b, ensure_ascii=False) for b in batchs])
         gpt_batch_file = self.client.files.create(
             file=batch_str.encode("utf-8"), purpose="batch"
@@ -61,14 +83,15 @@ class BatchProcessor:
         return self.client.batches.list(limit=limit).model_dump()
 
     def check_batch(self, batch_id):
-        retrieved = json.loads(self.client.batches.retrieve(batch_id).model_dump_json())
+        retrieved = self.client.batches.retrieve(batch_id).model_dump()
         if retrieved["status"] == "completed":
             print("배치 결과 완료!")
+            return retrieved
         else:
-            print(retrieved["status"])
+            return retrieved
 
     def result(self, batch_id):
-        retrieved = json.loads(self.client.batches.retrieve(batch_id).model_dump_json())
+        retrieved = self.client.batches.retrieve(batch_id).model_dump()
         if retrieved["status"] != "completed":
             raise ValueError("아직 완료안되었습니다.")
         output_file_id = retrieved["output_file_id"]
