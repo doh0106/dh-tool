@@ -1,7 +1,11 @@
 from openai import OpenAI
 import openai
 from .stream import convert_stream_completion
+from .structured import structured_body
 from copy import deepcopy
+from abc import ABC, abstractmethod
+from typing import List, Dict, Any, Union
+import json
 
 MODEL_PRICE = {
     "gpt-3.5-turbo-0125": [0.5 / 1000000, 1.5 / 1000000],
@@ -15,72 +19,109 @@ MODEL_PRICE = {
     "gpt-4o-mini-2024-07-18": [0.15 / 1000000, 0.6 / 1000000],
 }
 
+STRUCTURED_OUTPUT_MODELS = [
+    "gpt-4-1106-preview",
+    "gpt-4-0125-preview",
+    "gpt-4-turbo-preview",
+    "gpt-4o-mini",
+    "gpt-4o-mini-2024-07-18",
+]
 
-class GPT:
-    def __init__(self, api_key, model) -> None:
+
+class OpenAIClient:
+    def __init__(self, api_key: str):
         self.client = OpenAI(api_key=api_key)
         openai.api_key = api_key
-        self._instruction: str = None
-        self._model: str = model
-        self.model_emb = "text-embedding-3-large"
-        self._params: dict = {
-            "max_tokens": 1024,
-            "temperature": 0,
-            "seed": 0,
-        }
 
-    @property
-    def params(self) -> dict:
-        return self._params
 
-    @params.setter
-    def params(self, new_params: dict) -> None:
+class ModelConfig:
+    def __init__(self, model: str, params: Dict[str, Any], system_prompt: str = ""):
+        self.model = model
+        self.params = params
+        self.system_prompt = system_prompt
+
+    def update_params(self, new_params: Dict[str, Any]) -> None:
         if "max_tokens" in new_params:
-            if new_params["max_tokens"] < 1:
-                raise ValueError("max_tokens must be at least 1")
-            elif new_params["max_tokens"] > 4096:
-                raise ValueError("max_tokens must be at most 4096")
-        self._params.update(new_params)
+            if new_params["max_tokens"] < 1 or new_params["max_tokens"] > 4096:
+                raise ValueError("max_tokens must be between 1 and 4096")
+        self.params.update(new_params)
 
-    @property
-    def instruction(self) -> str:
-        return self._instruction
 
-    @instruction.setter
-    def instruction(self, new_instruction: str) -> None:
-        self._instruction = new_instruction
+class MessageHandler:
+    @staticmethod
+    def create_messages(system_prompt: str, user_message: str) -> List[Dict[str, str]]:
+        messages = [{"role": "user", "content": user_message}]
+        if system_prompt:
+            messages.insert(0, {"role": "system", "content": system_prompt})
+        return messages
 
-    @property
-    def model(self) -> str:
-        return self._model
 
-    @model.setter
-    def model(self, new_model: str) -> None:
-        if new_model not in MODEL_PRICE:
-            raise ValueError(f"model must in {list(MODEL_PRICE.keys())}")
-        self._model = new_model
+class BaseGPT(ABC):
+    def __init__(self, client: OpenAIClient, config: ModelConfig):
+        self.client = client
+        self.config = config
+        self.model_emb = "text-embedding-3-large"
+        self.message_handler = MessageHandler()
 
-    def chat(self, comment, return_all=False):
-        messages = [{"role": "user", "content": comment}]
-        if self.instruction:
-            messages.insert(0, {"role": "system", "content": self.instruction})
+    @abstractmethod
+    def chat(self, comment: str, return_all: bool = False):
+        pass
 
-        completion = self.client.chat.completions.create(
-            model=self.model, messages=messages, **self.params
+    @abstractmethod
+    def stream(self, comment: str, verbose: bool = True, return_all: bool = False):
+        pass
+
+    def embed(self, texts, return_all: bool = False):
+        if isinstance(texts, str):
+            texts = [texts]
+        response = self.client.client.embeddings.create(
+            input=texts, model=self.model_emb
+        )
+        if not return_all:
+            return [r.embedding for r in response.data]
+        else:
+            return response
+
+    @staticmethod
+    def calculate_price(
+        prompt_tokens: int,
+        completion_tokens: int,
+        model_name: str,
+        exchange_rate: float = 1400,
+    ) -> float:
+        if model_name in MODEL_PRICE:
+            token_prices = MODEL_PRICE[model_name]
+            return exchange_rate * (
+                prompt_tokens * token_prices[0] + completion_tokens * token_prices[1]
+            )
+        print(f"{model_name} not in price dict")
+        return 0
+
+
+class SimpleGPT(BaseGPT):
+    def __init__(self, client: OpenAIClient, config: ModelConfig):
+        super().__init__(client, config)
+
+    def chat(self, comment: str, return_all: bool = False):
+        messages = self.message_handler.create_messages(
+            self.config.system_prompt, comment
+        )
+        completion = self.client.client.chat.completions.create(
+            model=self.config.model, messages=messages, **self.config.params
         )
         if not return_all:
             return completion.choices[0].message.content
         else:
             return completion
 
-    def stream(self, comment, verbose=True, return_all=False):
-        messages = [{"role": "user", "content": comment}]
-        if self.instruction:
-            messages.insert(0, {"role": "system", "content": self.instruction})
-        stream_params = deepcopy(self.params)
+    def stream(self, comment: str, verbose: bool = True, return_all: bool = False):
+        messages = self.message_handler.create_messages(
+            self.config.system_prompt, comment
+        )
+        stream_params = deepcopy(self.config.params)
         stream_params.update({"stream_options": {"include_usage": True}})
-        stream = self.client.chat.completions.create(
-            model=self.model,
+        stream = self.client.client.chat.completions.create(
+            model=self.config.model,
             messages=messages,
             stream=True,
             **stream_params,
@@ -92,22 +133,122 @@ class GPT:
         else:
             return completion
 
-    def embed(self, texts, return_all=False):
-        if isinstance(texts, str):
-            texts = [texts]
-        response = openai.embeddings.create(input=texts, model=self.model_emb)
+
+class HistoryGPT(BaseGPT):
+    def __init__(self, client: OpenAIClient, config: ModelConfig):
+        super().__init__(client, config)
+        self.history: List[Dict[str, str]] = []
+        self.message_handler = MessageHandler()
+
+    def chat(self, comment: str, return_all: bool = False):
+        messages = self.history + self.message_handler.create_messages(
+            self.config.system_prompt, comment
+        )
+        completion = self.client.client.chat.completions.create(
+            model=self.config.model, messages=messages, **self.config.params
+        )
+
+        self.add_to_history(comment, completion.choices[0].message.content)
+
         if not return_all:
-            return [r.embedding for r in response.data]
+            return completion.choices[0].message.content
         else:
-            return response
+            return completion
 
-    @staticmethod
-    def cal_price(prompt_tokens, completion_tokens, model_name, exchange_rate=1400):
+    def stream(self, comment: str, verbose: bool = True, return_all: bool = False):
+        messages = self.history + self.message_handler.create_messages(
+            self.config.system_prompt, comment
+        )
+        stream_params = deepcopy(self.config.params)
+        stream_params.update({"stream_options": {"include_usage": True}})
+        stream = self.client.client.chat.completions.create(
+            model=self.config.model,
+            messages=messages,
+            stream=True,
+            **stream_params,
+        )
+        completion = convert_stream_completion(stream, verbose)
 
-        if model_name in MODEL_PRICE:
-            token_prices = MODEL_PRICE[model_name]
-            return exchange_rate * (
-                prompt_tokens * token_prices[0] + completion_tokens * token_prices[1]
+        self.add_to_history(comment, completion.choices[0].message.content)
+
+        if not return_all:
+            return completion.choices[0].message.content
+        else:
+            return completion
+
+    def clear_history(self):
+        self.history = []
+
+    def add_to_history(self, user_message: str, assistant_message: str):
+        self.history.append({"role": "user", "content": user_message})
+        self.history.append({"role": "assistant", "content": assistant_message})
+
+
+class StructuredGPT(BaseGPT):
+    def __init__(self, client: OpenAIClient, config: ModelConfig):
+        super().__init__(client, config)
+        if self.config.model not in STRUCTURED_OUTPUT_MODELS:
+            raise ValueError(
+                f"Model {self.config.model} does not support structured output"
             )
-        print(f"{model_name} not in price dict")
-        return 0
+
+    def chat(
+        self, content: str, response_format: Dict[str, Any], return_all: bool = False
+    ):
+        messages = self.message_handler.create_messages(
+            self.config.system_prompt, content
+        )
+        body = structured_body(
+            messages, response_format, model=self.config.model, **self.config.params
+        )
+        completion = self.client.client.chat.completions.create(**body)
+
+        if not return_all:
+            return json.loads(completion.choices[0].message.content)
+        else:
+            return completion
+
+    def stream(
+        self,
+        content: str,
+        response_format: Dict[str, Any],
+        verbose: bool = True,
+        return_all: bool = False,
+    ):
+        messages = self.message_handler.create_messages(
+            self.config.system_prompt, content
+        )
+        body = structured_body(
+            messages, response_format, model=self.config.model, **self.config.params
+        )
+        body["stream"] = True
+        stream = self.client.client.chat.completions.create(**body)
+        completion = convert_stream_completion(stream, verbose)
+
+        if not return_all:
+            return json.loads(completion.choices[0].message.content)
+        else:
+            return completion
+
+
+class GPTFactory:
+    @staticmethod
+    def create_gpt(
+        gpt_type: str,
+        api_key: str,
+        model: str,
+        params: Dict[str, Any],
+        system_prompt: str = "",
+    ) -> BaseGPT:
+        client = OpenAIClient(api_key)
+        config = ModelConfig(model, params, system_prompt)
+        if gpt_type == "simple_gpt":
+            return SimpleGPT(client, config)
+        elif gpt_type == "history_gpt":
+            return HistoryGPT(client, config)
+        elif gpt_type == "structured_gpt":
+            return StructuredGPT(client, config)
+        else:
+            raise ValueError(
+                "Invalid GPT type. Choose 'simple_gpt', 'history_gpt', or 'structured_gpt'."
+            )
