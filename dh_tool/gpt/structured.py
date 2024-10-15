@@ -1,4 +1,4 @@
-def structured_body(messages, response_format, **kwargs):
+def create_structured_body(messages, response_format, **kwargs):
     format = {
         "model": "gpt-4o-mini-2024-07-18",
         "messages": messages,

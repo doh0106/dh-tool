@@ -3,35 +3,36 @@ import pandas as pd
 
 from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
-from openpyxl.styles import Alignment
+from openpyxl.styles import Alignment, PatternFill, Font
+from openpyxl.utils import get_column_letter
+from openpyxl.formatting.rule import FormulaRule
+from ..utils.events import EventEmitter
 
-from .observer import Observer
 
-
-class ExcelHandler(Observer):
+class ExcelHandler(EventEmitter):
     def __init__(self):
         super().__init__()
         self.df = None
         self.workbook = Workbook()
         self.worksheet = self.workbook.active
-        self.workbook.remove(self.worksheet)  # 기본 시트 삭제
-        self.sheet_names = set()
+        self.worksheet.title = "Sheet1"  # 기본 시트 이름 설정
+        self.sheet_names = {"Sheet1"}
 
     def update(self, dataframe):
         self.df = dataframe
         self._update_worksheet()
+        self.emit("data_updated", self.df)
 
     def _update_worksheet(self):
         self.worksheet.delete_rows(1, self.worksheet.max_row)
         for row in dataframe_to_rows(self.df, index=False, header=True):
-            # self.worksheet.append(row)
             row = [self._convert_to_string_if_needed(cell) for cell in row]
             self.worksheet.append(row)
 
     def _convert_to_string_if_needed(self, value):
         """리스트나 배열을 문자열로 변환하여 엑셀에 넣을 수 있도록 처리"""
         if isinstance(value, (list, np.ndarray)):  # 리스트나 numpy 배열일 경우
-            return ', '.join(map(str, value))  # 쉼표로 구분된 문자열로 변환
+            return ", ".join(map(str, value))  # 쉼표로 구분된 문자열로 변환
         return value
 
     def set_column_width(self, **kwargs):
@@ -92,12 +93,12 @@ class ExcelHandler(Observer):
     # 시트 관련 기능 추가
     def create_sheet(self, dataframe, title=None):
         """새 시트 생성 및 데이터프레임 추가"""
-        if title:
-            if title in self.sheet_names:
-                print(f"{title} sheet은 이미 존재합니다, 이름을 바꿔주세요")
-                return False
-            else:
-                self.sheet_names.add(title)
+        if title is None:
+            title = f"Sheet{len(self.sheet_names) + 1}"
+        if title in self.sheet_names:
+            print(f"{title} sheet은 이미 존재합니다, 이름을 바꿔주세요")
+            return False
+        self.sheet_names.add(title)
         self.worksheet = self.workbook.create_sheet(title=title)
         self.df_to_worksheet(dataframe)
         self.df = dataframe
@@ -128,3 +129,38 @@ class ExcelHandler(Observer):
     def get_active_sheet(self):
         """현재 선택된 시트 이름 반환"""
         return self.worksheet.title
+
+    def apply_style(self, style_func):
+        """사용자 정의 스타일 함수 적용"""
+        for row in self.worksheet.iter_rows():
+            for cell in row:
+                style_func(cell)
+
+    def color_cells(self, condition, color):
+        """조건에 맞는 셀에 색상 적용"""
+        for row in self.worksheet.iter_rows():
+            for cell in row:
+                if condition(cell.value):
+                    cell.fill = PatternFill(
+                        start_color=color, end_color=color, fill_type="solid"
+                    )
+
+    def auto_adjust_columns(self):
+        """열 너비 자동 조정"""
+        for column in self.worksheet.columns:
+            max_length = 0
+            column_letter = get_column_letter(column[0].column)
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(cell.value)
+                except:
+                    pass
+            adjusted_width = (max_length + 2) * 1.2
+            self.worksheet.column_dimensions[column_letter].width = adjusted_width
+
+    def add_conditional_formatting(self, range_string, formula, fill):
+        """조건부 서식 추가"""
+        self.worksheet.conditional_formatting.add(
+            range_string, FormulaRule(formula=[formula], fill=fill)
+        )

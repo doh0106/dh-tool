@@ -1,7 +1,7 @@
 from openai import OpenAI
 import openai
-from .stream import convert_stream_completion
-from .structured import structured_body
+from .stream import process_and_convert_stream
+from .structured import create_structured_body
 from copy import deepcopy
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Union
@@ -126,7 +126,7 @@ class SimpleGPT(BaseGPT):
             stream=True,
             **stream_params,
         )
-        completion = convert_stream_completion(stream, verbose)
+        completion = process_and_convert_stream(stream, verbose)
 
         if not return_all:
             return completion.choices[0].message.content
@@ -167,7 +167,7 @@ class HistoryGPT(BaseGPT):
             stream=True,
             **stream_params,
         )
-        completion = convert_stream_completion(stream, verbose)
+        completion = process_and_convert_stream(stream, verbose)
 
         self.add_to_history(comment, completion.choices[0].message.content)
 
@@ -198,7 +198,7 @@ class StructuredGPT(BaseGPT):
         messages = self.message_handler.create_messages(
             self.config.system_prompt, content
         )
-        body = structured_body(
+        body = create_structured_body(
             messages, response_format, model=self.config.model, **self.config.params
         )
         completion = self.client.client.chat.completions.create(**body)
@@ -218,12 +218,12 @@ class StructuredGPT(BaseGPT):
         messages = self.message_handler.create_messages(
             self.config.system_prompt, content
         )
-        body = structured_body(
+        body = create_structured_body(
             messages, response_format, model=self.config.model, **self.config.params
         )
         body["stream"] = True
         stream = self.client.client.chat.completions.create(**body)
-        completion = convert_stream_completion(stream, verbose)
+        completion = process_and_convert_stream(stream, verbose)
 
         if not return_all:
             return json.loads(completion.choices[0].message.content)
