@@ -1,5 +1,7 @@
 from .base import DataFrame
 from ..handlers.excel_handler import ExcelHandler
+import numpy as np
+import pandas as pd
 
 
 class Sheets(DataFrame):
@@ -18,6 +20,7 @@ class Sheets(DataFrame):
 
     def save(self, filename):
         """엑셀 파일 저장"""
+        self.excel_handler.update(self.df)  # 현재 데이터프레임으로 업데이트
         self.excel_handler.save(filename)
 
     def close(self):

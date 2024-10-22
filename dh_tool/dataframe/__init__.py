@@ -28,8 +28,8 @@ DEFAULT_WIDTH_CONFIG = {
 __all__ = [
     "DataFrame",
     "Sheets",
-    "ExcelHandler",
     "DataFrameHandler",
+    "ExcelHandler",
     "VisualizationHandler",
     "DEFAULT_WIDTH_CONFIG",
 ]

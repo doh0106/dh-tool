@@ -1,5 +1,7 @@
+import json
 import numpy as np
 import pandas as pd
+from datetime import datetime
 
 from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
@@ -25,14 +27,30 @@ class ExcelHandler(EventEmitter):
 
     def _update_worksheet(self):
         self.worksheet.delete_rows(1, self.worksheet.max_row)
+
+        # 열 이름에 접두사 추가 (이미 'col_'로 시작하는 경우 제외)
+        self.df.columns = [
+            col if col.startswith("col_") else f"col_{col}" for col in self.df.columns
+        ]
+
         for row in dataframe_to_rows(self.df, index=False, header=True):
             row = [self._convert_to_string_if_needed(cell) for cell in row]
             self.worksheet.append(row)
 
     def _convert_to_string_if_needed(self, value):
-        """리스트나 배열을 문자열로 변환하여 엑셀에 넣을 수 있도록 처리"""
-        if isinstance(value, (list, np.ndarray)):  # 리스트나 numpy 배열일 경우
-            return ", ".join(map(str, value))  # 쉼표로 구분된 문자열로 변환
+        """복잡한 데이터 타입을 문자열로 변환"""
+        if isinstance(value, (list, dict)):
+            return json.dumps(value)
+        elif isinstance(value, np.ndarray):
+            return np.array2string(value)
+        elif pd.isna(value):
+            return ""
+        elif isinstance(value, (np.int64, np.float64)):
+            return float(value)
+        elif isinstance(value, datetime):
+            return value.isoformat()
+        elif value in (np.inf, -np.inf):
+            return str(value)
         return value
 
     def set_column_width(self, **kwargs):
@@ -109,7 +127,29 @@ class ExcelHandler(EventEmitter):
         self.worksheet = self.workbook[title]
         data = list(self.worksheet.values)
         cols = data[0]  # First row as columns
-        self.df = pd.DataFrame(data[1:], columns=cols)  # Use the rest as data
+        self.df = pd.DataFrame(data[1:], columns=cols)
+
+        # 열 이름에서 접두사 제거 (모든 'col_' 접두사 제거)
+        self.df.columns = [col.replace("col_", "") for col in self.df.columns]
+
+        # 데이터 타입 복원
+        for col in self.df.columns:
+            if self.df[col].dtype == "object":
+                try:
+                    # JSON 형식의 문자열을 파이썬 객체로 변환 시도
+                    self.df[col] = self.df[col].apply(json.loads)
+                except:
+                    pass
+
+                try:
+                    # 날짜 형식 문자열을 datetime 객체로 변환 시도
+                    self.df[col] = pd.to_datetime(self.df[col])
+                except:
+                    pass
+
+                # inf, -inf 처리
+                self.df[col] = self.df[col].replace({"inf": np.inf, "-inf": -np.inf})
+
         return self.df
 
     def remove_sheet(self, title):

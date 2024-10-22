@@ -231,6 +231,29 @@ class StructuredGPT(BaseGPT):
             return completion
 
 
+def create_gpt(
+    gpt_type: str,
+    api_key: str,
+    model: str,
+    params: Dict[str, Any] = None,
+    system_prompt: str = "",
+) -> BaseGPT:
+    """
+    노트북 환경에서 쉽게 GPT 객체를 생성하는 함수
+
+    :param gpt_type: GPT 유형 ('simple_gpt', 'history_gpt', 'structured_gpt')
+    :param api_key: OpenAI API 키
+    :param model: 사용할 모델 이름
+    :param params: 모델 파라미터 (기본값: None)
+    :param system_prompt: 시스템 프롬프트 (기본값: "")
+    :return: 생성된 GPT 객체
+    """
+    if params is None:
+        params = {}
+
+    return GPTFactory.create_gpt(gpt_type, api_key, model, params, system_prompt)
+
+
 class GPTFactory:
     @staticmethod
     def create_gpt(

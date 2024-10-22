@@ -218,6 +218,18 @@ class XmlFileHandler(FileHandler):
         tree.write(path, **kwargs)
 
 
+class MarkDownFileHandler(FileHandler):
+    @exception_handler
+    def load(self, path: str, **kwargs):
+        with open(path, "r", **kwargs) as file:
+            return file.read()
+
+    @exception_handler
+    def save(self, data, path: str, **kwargs):
+        with open(path, "w", **kwargs) as file:
+            file.write(data)
+
+
 class FileHandlerFactory:
     @staticmethod
     def create_handler(file_type: str) -> FileHandler:
@@ -243,25 +255,54 @@ class FileHandlerFactory:
             "mp4": VideoFileHandler(),
             "avi": VideoFileHandler(),
             "xml": XmlFileHandler(),
+            "md": MarkDownFileHandler(),
         }
         return handlers.get(file_type.lower(), None)
 
 
-# # 사용 예:
-# def load(path: str, return_filename=False, **kwargs):
-#     file_name, file_type = os.path.basename(path).split(".")
-#     handler = FileHandlerFactory.create_handler(file_type)
-#     if handler:
-#         data = handler.load(path, **kwargs)
-#         return (data, file_name) if return_filename else data
-#     else:
-#         raise ValueError(f"Unsupported file type: {file_type}")
+class FileIO:
+    @staticmethod
+    def load(path: str, return_filename=False, **kwargs):
+        file_name, file_type = os.path.splitext(path)
+        file_type = file_type.lstrip(".").lower()
+        handler = FileHandlerFactory.create_handler(file_type)
+        if handler:
+            data = handler.load(path, **kwargs)
+            return (data, os.path.basename(file_name)) if return_filename else data
+        else:
+            raise ValueError(f"Unsupported file type: {file_type}")
+
+    @staticmethod
+    def save(data, path: str, **kwargs):
+        file_type = os.path.splitext(path)[1].lstrip(".").lower()
+        handler = FileHandlerFactory.create_handler(file_type)
+        if handler:
+            return handler.save(data, path, **kwargs)
+        else:
+            raise ValueError(f"Unsupported file type: {file_type}")
 
 
-# def save(data, path: str, **kwargs):
-#     file_type = os.path.basename(path).split(".")[-1].lower()
-#     handler = FileHandlerFactory.create_handler(file_type)
-#     if handler:
-#         return handler.save(data, path, **kwargs)
-#     else:
-#         raise ValueError(f"Unsupported file type: {file_type}")
+# from typing import Callable
+
+# load: Callable[..., None] = FileIO.load
+# save: Callable[..., None] = FileIO.save
+
+
+def load(path: str, return_filename=False, **kwargs):
+    file_name, file_type = os.path.splitext(path)
+    file_type = file_type.lstrip(".").lower()
+    handler = FileHandlerFactory.create_handler(file_type)
+    if handler:
+        data = handler.load(path, **kwargs)
+        return (data, os.path.basename(file_name)) if return_filename else data
+    else:
+        raise ValueError(f"Unsupported file type: {file_type}")
+
+
+def save(data, path: str, **kwargs):
+    file_type = os.path.splitext(path)[1].lstrip(".").lower()
+    handler = FileHandlerFactory.create_handler(file_type)
+    if handler:
+        return handler.save(data, path, **kwargs)
+    else:
+        raise ValueError(f"Unsupported file type: {file_type}")
