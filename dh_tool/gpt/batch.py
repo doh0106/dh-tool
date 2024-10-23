@@ -164,14 +164,22 @@ class BatchProcessor:
         if retrieved["status"] != "completed":
             raise ValueError("아직 완료되지 않았습니다.")
         output_file_id = retrieved["output_file_id"]
-        contents = [
-            json.loads(i)
-            for i in self.client.files.content(output_file_id)
-            .read()
-            .decode("utf-8")
-            .splitlines()
-        ]
+
+        contents = self.get_file_contents(output_file_id)
         return contents
+
+    def get_file_contents(self, file_id):
+        try:
+            contents = [
+                json.loads(line)
+                for line in self.client.files.content(file_id)
+                .read()
+                .decode("utf-8")
+                .splitlines()
+            ]
+            return contents
+        except:
+            raise ValueError("해당 file_id를 가져오는 데 실패했습니다.")
 
     def make_batch(
         self,
