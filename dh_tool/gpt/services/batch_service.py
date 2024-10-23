@@ -1,9 +1,11 @@
-import uuid
-import json
 from abc import ABC, abstractmethod
-from openai import OpenAI
 from typing import List, Dict, Any, Union
-from .models import (
+import json
+import uuid
+
+from openai import OpenAI
+
+from ..models import (
     BatchFormat,
     ChatCompletionRequest,
     StructuredChatCompletionRequest,

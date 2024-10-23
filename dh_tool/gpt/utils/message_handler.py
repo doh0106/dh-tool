@@ -1,5 +1,5 @@
 from typing import List, Dict
-from .models import Message
+from ..models import Message
 
 
 class MessageHandler:

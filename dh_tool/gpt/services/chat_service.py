@@ -1,22 +1,24 @@
-from .stream import process_and_convert_stream
-from copy import deepcopy
 from typing import List, Dict, Any
 import json
-from .base import BaseGPT
-from .client import OpenAIClient
-from .config import ModelConfig
-from .constants import STRUCTURED_OUTPUT_MODELS
-from .models import (
+from copy import deepcopy
+
+import openai
+
+from ..core.base import BaseChatModel
+from ..core.config import ModelConfig
+from ..core.constants import STRUCTURED_OUTPUT_MODELS
+from ..models import (
     ChatCompletionRequest,
     Message,
     StructuredChatCompletionRequest,
     StructuredResponseFormat,
 )
-from .utils import MessageHandler
+from ..utils.message_handler import MessageHandler
+from ..utils.stream_processor import process_and_convert_stream
 
 
-class SimpleGPT(BaseGPT):
-    def __init__(self, client: OpenAIClient, config: ModelConfig):
+class SimpleChatModel(BaseChatModel):
+    def __init__(self, client: openai.OpenAI, config: ModelConfig):
         super().__init__(client, config)
 
     def chat(self, comment: str, return_all: bool = False):
@@ -58,8 +60,8 @@ class SimpleGPT(BaseGPT):
             return completion
 
 
-class HistoryGPT(BaseGPT):
-    def __init__(self, client: OpenAIClient, config: ModelConfig):
+class HistoryChatModel(BaseChatModel):
+    def __init__(self, client: openai.OpenAI, config: ModelConfig):
         super().__init__(client, config)
         self.history: List[Message] = []
         self.message_handler = MessageHandler()
@@ -108,8 +110,8 @@ class HistoryGPT(BaseGPT):
         self.history.append({"role": "assistant", "content": assistant_message})
 
 
-class StructuredGPT(BaseGPT):
-    def __init__(self, client: OpenAIClient, config: ModelConfig):
+class StructuredChatModel(BaseChatModel):
+    def __init__(self, client: openai.OpenAI, config: ModelConfig):
         super().__init__(client, config)
         if self.config.model not in STRUCTURED_OUTPUT_MODELS:
             raise ValueError(
@@ -175,11 +177,11 @@ def create_gpt(
     model: str,
     params: Dict[str, Any] = None,
     system_prompt: str = "",
-) -> BaseGPT:
+) -> BaseChatModel:
     """
     노트북 환경에서 쉽게 GPT 객체를 생성하는 함수
 
-    :param gpt_type: GPT 유형 ('simple_gpt', 'history_gpt', 'structured_gpt')
+    :param gpt_type: GPT 유형 ('simple', 'history', 'structured')
     :param api_key: OpenAI API 키
     :param model: 사용할 모델 이름
     :param params: 모델 파라미터 (기본값: None)
@@ -200,16 +202,16 @@ class GPTFactory:
         model: str,
         params: Dict[str, Any],
         system_prompt: str = "",
-    ) -> BaseGPT:
-        client = OpenAIClient(api_key)
+    ) -> BaseChatModel:
+        client = openai.OpenAI(api_key)
         config = ModelConfig(model, params, system_prompt)
-        if gpt_type == "simple_gpt":
-            return SimpleGPT(client, config)
-        elif gpt_type == "history_gpt":
-            return HistoryGPT(client, config)
-        elif gpt_type == "structured_gpt":
-            return StructuredGPT(client, config)
+        if gpt_type == "simple":
+            return SimpleChatModel(client, config)
+        elif gpt_type == "history":
+            return HistoryChatModel(client, config)
+        elif gpt_type == "structured":
+            return StructuredChatModel(client, config)
         else:
             raise ValueError(
-                "Invalid GPT type. Choose 'simple_gpt', 'history_gpt', or 'structured_gpt'."
+                "Invalid GPT type. Choose 'simple', 'history', or 'structured'."
             )

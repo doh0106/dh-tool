@@ -1,13 +1,24 @@
 from abc import ABC, abstractmethod
+from typing import Any, Dict, List
 
-from .client import OpenAIClient
+import openai
+
 from .config import ModelConfig
 from .constants import MODEL_PRICE
-from .utils import MessageHandler
+from ..models import Message, ChatCompletionRequest
+from ..utils.message_handler import MessageHandler
 
 
-class BaseGPT(ABC):
-    def __init__(self, client: OpenAIClient, config: ModelConfig):
+class RequestFactory(ABC):
+    @abstractmethod
+    def create_request(
+        self, model: str, messages: List[Message], params: Dict[str, Any]
+    ) -> ChatCompletionRequest:
+        pass
+
+
+class BaseChatModel(ABC):
+    def __init__(self, client: openai.OpenAI, config: ModelConfig):
         self.client = client
         self.config = config
         self.model_emb = "text-embedding-3-large"
