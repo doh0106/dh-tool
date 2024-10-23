@@ -72,7 +72,7 @@ class BatchCreator:
         model,
         custom_ids: List[str] = None,
         **gpt_params,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[BatchFormat]:
         """프롬프트 목록에 대한 배치를 생성"""
         if isinstance(prompts, str):
             prompts = [prompts]
@@ -93,13 +93,15 @@ class BatchCreator:
 
     def make_structured_batch(
         self,
-        prompts: List[Dict[str, Any]],
+        prompts: Union[str, List[str]],
         model,
         response_format,
         custom_ids: List[str] = None,
         **gpt_params,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[BatchFormat]:
         """구조화된 본문 목록에 대한 배치를 생성"""
+        if isinstance(prompts, str):
+            prompts = [prompts]
         if custom_ids is None:
             return [
                 self.formatter.create_structured_batch_format(
@@ -128,10 +130,12 @@ class BatchProcessor:
         self.batch_creator = BatchCreator(BatchFormatter(), UUIDGenerator())
 
     def create_and_submit_batch(
-        self, batches: List[Dict[str, Any]], meta_data: Dict[str, Any]
+        self, batches: List[BatchFormat], meta_data: Dict[str, Any]
     ):
         """배치를 생성하고 제출"""
-        batch_str = "\n".join([json.dumps(b, ensure_ascii=False) for b in batches])
+        batch_str = "\n".join(
+            [json.dumps(batch.model_dump(), ensure_ascii=False) for batch in batches]
+        )
         gpt_batch_file = self.client.files.create(
             file=batch_str.encode("utf-8"), purpose="batch"
         )
@@ -175,18 +179,18 @@ class BatchProcessor:
         model,
         custom_ids: List[str] = None,
         **gpt_params,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[BatchFormat]:
         """BatchCreator를 통해 배치 생성"""
         return self.batch_creator.make_batch(prompts, model, custom_ids, **gpt_params)
 
     def make_structured_batch(
         self,
-        prompts: List[Dict[str, Any]],
+        prompts: Union[str, List[str]],
         model,
         response_format,
         custom_ids: List[str] = None,
         **gpt_params,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[BatchFormat]:
         """BatchCreator를 통해 구조화된 배치 생성"""
         return self.batch_creator.make_structured_batch(
             prompts, model, response_format, custom_ids, **gpt_params

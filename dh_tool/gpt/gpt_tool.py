@@ -10,7 +10,7 @@ from .models import (
     ChatCompletionRequest,
     Message,
     StructuredChatCompletionRequest,
-    ResponseFormat,
+    StructuredResponseFormat,
 )
 from .utils import MessageHandler
 
@@ -30,7 +30,9 @@ class SimpleGPT(BaseGPT):
             model=self.config.model, messages=messages, **self.config.params
         )
 
-        completion = self.client.client.chat.completions.create(**chat_request.dict())
+        completion = self.client.client.chat.completions.create(
+            **chat_request.model_dump()
+        )
         if not return_all:
             return completion.choices[0].message.content
         else:
@@ -59,12 +61,12 @@ class SimpleGPT(BaseGPT):
 class HistoryGPT(BaseGPT):
     def __init__(self, client: OpenAIClient, config: ModelConfig):
         super().__init__(client, config)
-        self.history: List[Dict[str, str]] = []
+        self.history: List[Message] = []
         self.message_handler = MessageHandler()
 
     def chat(self, comment: str, return_all: bool = False):
         messages = self.history + self.message_handler.create_messages(
-            self.config.system_prompt, comment
+            self.config.system_prompt, Message(role="user", content=comment)
         )
         completion = self.client.client.chat.completions.create(
             model=self.config.model, messages=messages, **self.config.params
@@ -79,7 +81,7 @@ class HistoryGPT(BaseGPT):
 
     def stream(self, comment: str, verbose: bool = True, return_all: bool = False):
         messages = self.history + self.message_handler.create_messages(
-            self.config.system_prompt, comment
+            self.config.system_prompt, Message(role="user", content=comment)
         )
         stream_params = deepcopy(self.config.params)
         stream_params.update({"stream_options": {"include_usage": True}})
@@ -126,11 +128,13 @@ class StructuredGPT(BaseGPT):
         chat_request = StructuredChatCompletionRequest(
             model=self.config.model,
             messages=messages,
-            response_format=ResponseFormat(**response_format),
+            response_format=StructuredResponseFormat(**response_format),
             **self.config.params,
         )
 
-        completion = self.client.client.chat.completions.create(**chat_request.dict())
+        completion = self.client.client.chat.completions.create(
+            **chat_request.model_dump()
+        )
         if not return_all:
             return json.loads(completion.choices[0].message.content)
         else:
@@ -152,11 +156,11 @@ class StructuredGPT(BaseGPT):
         chat_request = StructuredChatCompletionRequest(
             model=self.config.model,
             messages=messages,
-            response_format=ResponseFormat(**response_format),
+            response_format=StructuredResponseFormat(**response_format),
             **self.config.params,
         )
         chat_request["stream"] = True
-        stream = self.client.client.chat.completions.create(**chat_request.dict())
+        stream = self.client.client.chat.completions.create(**chat_request.model_dump())
         completion = process_and_convert_stream(stream, verbose)
 
         if not return_all:

@@ -23,7 +23,7 @@ class ChatCompletionRequest(BaseModel):
     temperature: Optional[float] = 0
     seed: Optional[int] = 1
     stream: Optional[bool] = False
-    response_format: Optional[ResponseFormat] = None
+    response_format: Optional[Union[ResponseFormat, StructuredResponseFormat]] = None
     # 다른 가능한 파라미터들...
 
 
