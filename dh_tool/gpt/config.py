@@ -1,4 +1,5 @@
-from typing import  Dict, Any
+from typing import Dict, Any
+
 
 class ModelConfig:
     def __init__(self, model: str, params: Dict[str, Any], system_prompt: str = ""):

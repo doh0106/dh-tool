@@ -1,4 +1,3 @@
-
 from typing import List, Dict
 
 
@@ -9,5 +8,3 @@ class MessageHandler:
         if system_prompt:
             messages.insert(0, {"role": "system", "content": system_prompt})
         return messages
-
-

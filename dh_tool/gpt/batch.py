@@ -8,7 +8,7 @@ from .models import (
     ChatCompletionRequest,
     StructuredChatCompletionRequest,
     Message,
-    ResponseFormat,
+    StructuredResponseFormat,
 )
 
 
@@ -53,7 +53,7 @@ class BatchFormatter:
         chat_request = StructuredChatCompletionRequest(
             model=model,
             messages=[Message(role="user", content=prompt)],
-            response_format=ResponseFormat(**response_format),
+            response_format=StructuredResponseFormat(**response_format),
             **gpt_params,
         )
         return BatchFormat(custom_id=custom_id, body=chat_request)
@@ -67,39 +67,56 @@ class BatchCreator:
         self.id_generator = id_generator
 
     def make_batch(
-        self, prompts: Union[str, List[str]], custom_ids: List[str] = None, **gpt_params
+        self,
+        prompts: Union[str, List[str]],
+        model,
+        custom_ids: List[str] = None,
+        **gpt_params,
     ) -> List[Dict[str, Any]]:
         """프롬프트 목록에 대한 배치를 생성"""
         if isinstance(prompts, str):
             prompts = [prompts]
         if custom_ids is None:
             return [
-                self.formatter.format_batch(
-                    self.id_generator.generate(), prompt, **gpt_params
+                self.formatter.create_simple_batch_format(
+                    self.id_generator.generate(), prompt, model, **gpt_params
                 )
                 for prompt in prompts
             ]
         else:
             return [
-                self.formatter.format_batch(cid, prompt, **gpt_params)
-                for cid, prompt in zip(custom_ids, prompts)
+                self.formatter.create_simple_batch_format(
+                    custom_id, prompt, model, **gpt_params
+                )
+                for custom_id, prompt in zip(custom_ids, prompts)
             ]
 
     def make_structured_batch(
-        self, bodies: List[Dict[str, Any]], custom_ids: List[str] = None
+        self,
+        prompts: List[Dict[str, Any]],
+        model,
+        response_format,
+        custom_ids: List[str] = None,
+        **gpt_params,
     ) -> List[Dict[str, Any]]:
         """구조화된 본문 목록에 대한 배치를 생성"""
         if custom_ids is None:
             return [
-                self.formatter.format_structured_batch(
-                    self.id_generator.generate(), body
+                self.formatter.create_structured_batch_format(
+                    self.id_generator.generate(),
+                    prompt,
+                    model,
+                    response_format,
+                    **gpt_params,
                 )
-                for body in bodies
+                for prompt in prompts
             ]
         else:
             return [
-                self.formatter.format_structured_batch(cid, body)
-                for cid, body in zip(custom_ids, bodies)
+                self.formatter.create_structured_batch_format(
+                    custom_id, prompt, model, response_format, **gpt_params
+                )
+                for custom_id, prompt in zip(custom_ids, prompts)
             ]
 
 
@@ -153,13 +170,24 @@ class BatchProcessor:
         return contents
 
     def make_batch(
-        self, prompts: Union[str, List[str]], custom_ids: List[str] = None, **gpt_params
+        self,
+        prompts: Union[str, List[str]],
+        model,
+        custom_ids: List[str] = None,
+        **gpt_params,
     ) -> List[Dict[str, Any]]:
         """BatchCreator를 통해 배치 생성"""
-        return self.batch_creator.make_batch(prompts, custom_ids, **gpt_params)
+        return self.batch_creator.make_batch(prompts, model, custom_ids, **gpt_params)
 
     def make_structured_batch(
-        self, bodies: List[Dict[str, Any]], custom_ids: List[str] = None
+        self,
+        prompts: List[Dict[str, Any]],
+        model,
+        response_format,
+        custom_ids: List[str] = None,
+        **gpt_params,
     ) -> List[Dict[str, Any]]:
         """BatchCreator를 통해 구조화된 배치 생성"""
-        return self.batch_creator.make_structured_batch(bodies, custom_ids)
+        return self.batch_creator.make_structured_batch(
+            prompts, model, response_format, custom_ids, **gpt_params
+        )

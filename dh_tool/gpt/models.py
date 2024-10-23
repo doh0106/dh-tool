@@ -35,6 +35,4 @@ class BatchFormat(BaseModel):
     custom_id: str
     method: str = "POST"
     url: str = "/v1/chat/completions"
-    body: Union[
-        ChatCompletionRequest, StructuredChatCompletionRequest
-    ]
+    body: Union[ChatCompletionRequest, StructuredChatCompletionRequest]

@@ -15,7 +15,6 @@ from .models import (
 from .utils import MessageHandler
 
 
-
 class SimpleGPT(BaseGPT):
     def __init__(self, client: OpenAIClient, config: ModelConfig):
         super().__init__(client, config)

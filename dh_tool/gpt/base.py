@@ -5,6 +5,7 @@ from .config import ModelConfig
 from .constants import MODEL_PRICE
 from .utils import MessageHandler
 
+
 class BaseGPT(ABC):
     def __init__(self, client: OpenAIClient, config: ModelConfig):
         self.client = client
