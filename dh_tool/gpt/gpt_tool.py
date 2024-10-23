@@ -1,101 +1,19 @@
-from openai import OpenAI
-import openai
 from .stream import process_and_convert_stream
-from .structured import create_structured_body
 from copy import deepcopy
-from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any
 import json
+from .base import BaseGPT
+from .client import OpenAIClient
+from .config import ModelConfig
+from .constants import STRUCTURED_OUTPUT_MODELS
+from .models import (
+    ChatCompletionRequest,
+    Message,
+    StructuredChatCompletionRequest,
+    ResponseFormat,
+)
+from .utils import MessageHandler
 
-MODEL_PRICE = {
-    "gpt-3.5-turbo-0125": [0.5 / 1000000, 1.5 / 1000000],
-    "gpt-3.5-turbo-0301": [1.5 / 1000000, 2 / 1000000],
-    "gpt-4": [30 / 1000000, 60 / 1000000],
-    "gpt-4-0125-preview": [10 / 1000000, 30 / 1000000],
-    "gpt-4o": [5 / 1000000, 15 / 1000000],
-    "gpt-4o-2024-05-13": [5 / 1000000, 15 / 1000000],
-    "gpt-4o-2024-08-06": [2.5 / 1000000, 10 / 1000000],
-    "gpt-4o-mini": [0.15 / 1000000, 0.6 / 1000000],
-    "gpt-4o-mini-2024-07-18": [0.15 / 1000000, 0.6 / 1000000],
-}
-
-STRUCTURED_OUTPUT_MODELS = [
-    "gpt-4-1106-preview",
-    "gpt-4-0125-preview",
-    "gpt-4-turbo-preview",
-    "gpt-4o-mini",
-    "gpt-4o-mini-2024-07-18",
-]
-
-
-class OpenAIClient:
-    def __init__(self, api_key: str):
-        self.client = OpenAI(api_key=api_key)
-        openai.api_key = api_key
-
-
-class ModelConfig:
-    def __init__(self, model: str, params: Dict[str, Any], system_prompt: str = ""):
-        self.model = model
-        self.params = params
-        self.system_prompt = system_prompt
-
-    def update_params(self, new_params: Dict[str, Any]) -> None:
-        if "max_tokens" in new_params:
-            if new_params["max_tokens"] < 1 or new_params["max_tokens"] > 4096:
-                raise ValueError("max_tokens must be between 1 and 4096")
-        self.params.update(new_params)
-
-
-class MessageHandler:
-    @staticmethod
-    def create_messages(system_prompt: str, user_message: str) -> List[Dict[str, str]]:
-        messages = [{"role": "user", "content": user_message}]
-        if system_prompt:
-            messages.insert(0, {"role": "system", "content": system_prompt})
-        return messages
-
-
-class BaseGPT(ABC):
-    def __init__(self, client: OpenAIClient, config: ModelConfig):
-        self.client = client
-        self.config = config
-        self.model_emb = "text-embedding-3-large"
-        self.message_handler = MessageHandler()
-
-    @abstractmethod
-    def chat(self, comment: str, return_all: bool = False):
-        pass
-
-    @abstractmethod
-    def stream(self, comment: str, verbose: bool = True, return_all: bool = False):
-        pass
-
-    def embed(self, texts, return_all: bool = False):
-        if isinstance(texts, str):
-            texts = [texts]
-        response = self.client.client.embeddings.create(
-            input=texts, model=self.model_emb
-        )
-        if not return_all:
-            return [r.embedding for r in response.data]
-        else:
-            return response
-
-    @staticmethod
-    def calculate_price(
-        prompt_tokens: int,
-        completion_tokens: int,
-        model_name: str,
-        exchange_rate: float = 1400,
-    ) -> float:
-        if model_name in MODEL_PRICE:
-            token_prices = MODEL_PRICE[model_name]
-            return exchange_rate * (
-                prompt_tokens * token_prices[0] + completion_tokens * token_prices[1]
-            )
-        print(f"{model_name} not in price dict")
-        return 0
 
 
 class SimpleGPT(BaseGPT):
@@ -103,12 +21,17 @@ class SimpleGPT(BaseGPT):
         super().__init__(client, config)
 
     def chat(self, comment: str, return_all: bool = False):
-        messages = self.message_handler.create_messages(
-            self.config.system_prompt, comment
-        )
-        completion = self.client.client.chat.completions.create(
+        messages = [Message(role="user", content=comment)]
+        if self.config.system_prompt:
+            messages.insert(
+                0, Message(role="system", content=self.config.system_prompt)
+            )
+
+        chat_request = ChatCompletionRequest(
             model=self.config.model, messages=messages, **self.config.params
         )
+
+        completion = self.client.client.chat.completions.create(**chat_request.dict())
         if not return_all:
             return completion.choices[0].message.content
         else:
@@ -195,14 +118,20 @@ class StructuredGPT(BaseGPT):
     def chat(
         self, content: str, response_format: Dict[str, Any], return_all: bool = False
     ):
-        messages = self.message_handler.create_messages(
-            self.config.system_prompt, content
-        )
-        body = create_structured_body(
-            messages, response_format, model=self.config.model, **self.config.params
-        )
-        completion = self.client.client.chat.completions.create(**body)
+        messages = [Message(role="user", content=content)]
+        if self.config.system_prompt:
+            messages.insert(
+                0, Message(role="system", content=self.config.system_prompt)
+            )
 
+        chat_request = StructuredChatCompletionRequest(
+            model=self.config.model,
+            messages=messages,
+            response_format=ResponseFormat(**response_format),
+            **self.config.params,
+        )
+
+        completion = self.client.client.chat.completions.create(**chat_request.dict())
         if not return_all:
             return json.loads(completion.choices[0].message.content)
         else:
@@ -215,14 +144,20 @@ class StructuredGPT(BaseGPT):
         verbose: bool = True,
         return_all: bool = False,
     ):
-        messages = self.message_handler.create_messages(
-            self.config.system_prompt, content
+        messages = [Message(role="user", content=content)]
+        if self.config.system_prompt:
+            messages.insert(
+                0, Message(role="system", content=self.config.system_prompt)
+            )
+
+        chat_request = StructuredChatCompletionRequest(
+            model=self.config.model,
+            messages=messages,
+            response_format=ResponseFormat(**response_format),
+            **self.config.params,
         )
-        body = create_structured_body(
-            messages, response_format, model=self.config.model, **self.config.params
-        )
-        body["stream"] = True
-        stream = self.client.client.chat.completions.create(**body)
+        chat_request["stream"] = True
+        stream = self.client.client.chat.completions.create(**chat_request.dict())
         completion = process_and_convert_stream(stream, verbose)
 
         if not return_all:

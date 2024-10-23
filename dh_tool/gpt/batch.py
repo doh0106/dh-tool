@@ -1,62 +1,81 @@
 import uuid
 import json
+from abc import ABC, abstractmethod
 from openai import OpenAI
 from typing import List, Dict, Any, Union
+from .models import (
+    BatchFormat,
+    ChatCompletionRequest,
+    StructuredChatCompletionRequest,
+    Message,
+    ResponseFormat,
+)
 
 
-class UUIDGenerator:
+class IDGenerator(ABC):
+    """ID 생성을 위한 추상 기본 클래스"""
+
+    @abstractmethod
+    def generate(self) -> str:
+        pass
+
+
+class UUIDGenerator(IDGenerator):
+    """UUID를 생성하는 구체적인 클래스"""
+
     @staticmethod
     def generate() -> str:
         return str(uuid.uuid4())
 
 
 class BatchFormatter:
-    @staticmethod
-    def format_batch(
-        custom_id: str, prompt: str, model: str, **gpt_params
-    ) -> Dict[str, Any]:
-        batch_format = {
-            "custom_id": custom_id,
-            "method": "POST",
-            "url": "/v1/chat/completions",
-            "body": {
-                "model": model,
-                "messages": [
-                    {"role": "user", "content": prompt},
-                ],
-                "max_tokens": 4096,
-                "temperature": 0,
-                "seed": 1,
-            },
-        }
-        if gpt_params:
-            batch_format["body"].update(gpt_params)
-        return batch_format
+    """배치 요청 형식을 만드는 클래스"""
 
     @staticmethod
-    def format_struct_batch(custom_id: str, body: Dict[str, Any]) -> Dict[str, Any]:
-        return {
-            "custom_id": custom_id,
-            "method": "POST",
-            "url": "/v1/chat/completions",
-            "body": body,
-        }
+    def create_simple_batch_format(
+        custom_id: str, prompt: str, model: str, **gpt_params
+    ) -> BatchFormat:
+        """단일 프롬프트에 대한 일반 배치 형식을 생성"""
+        chat_request = ChatCompletionRequest(
+            model=model, messages=[Message(role="user", content=prompt)], **gpt_params
+        )
+        return BatchFormat(custom_id=custom_id, body=chat_request)
+
+    @staticmethod
+    def create_structured_batch_format(
+        custom_id: str,
+        prompt: str,
+        model: str,
+        response_format: Dict[str, Any],
+        **gpt_params,
+    ) -> BatchFormat:
+        """구조화된 응답을 위한 배치 형식을 생성"""
+        chat_request = StructuredChatCompletionRequest(
+            model=model,
+            messages=[Message(role="user", content=prompt)],
+            response_format=ResponseFormat(**response_format),
+            **gpt_params,
+        )
+        return BatchFormat(custom_id=custom_id, body=chat_request)
 
 
 class BatchCreator:
-    def __init__(self, formatter: BatchFormatter, uuid_generator: UUIDGenerator):
+    """배치 생성을 담당하는 클래스"""
+
+    def __init__(self, formatter: BatchFormatter, id_generator: IDGenerator):
         self.formatter = formatter
-        self.uuid_generator = uuid_generator
+        self.id_generator = id_generator
 
     def make_batch(
         self, prompts: Union[str, List[str]], custom_ids: List[str] = None, **gpt_params
     ) -> List[Dict[str, Any]]:
+        """프롬프트 목록에 대한 배치를 생성"""
         if isinstance(prompts, str):
             prompts = [prompts]
         if custom_ids is None:
             return [
                 self.formatter.format_batch(
-                    self.uuid_generator.generate(), prompt, **gpt_params
+                    self.id_generator.generate(), prompt, **gpt_params
                 )
                 for prompt in prompts
             ]
@@ -66,30 +85,35 @@ class BatchCreator:
                 for cid, prompt in zip(custom_ids, prompts)
             ]
 
-    def make_struct_batch(
+    def make_structured_batch(
         self, bodies: List[Dict[str, Any]], custom_ids: List[str] = None
     ) -> List[Dict[str, Any]]:
+        """구조화된 본문 목록에 대한 배치를 생성"""
         if custom_ids is None:
             return [
-                self.formatter.format_struct_batch(self.uuid_generator.generate(), body)
+                self.formatter.format_structured_batch(
+                    self.id_generator.generate(), body
+                )
                 for body in bodies
             ]
         else:
             return [
-                self.formatter.format_struct_batch(cid, body)
+                self.formatter.format_structured_batch(cid, body)
                 for cid, body in zip(custom_ids, bodies)
             ]
 
 
 class BatchProcessor:
+    """배치 처리를 담당하는 클래스"""
+
     def __init__(self, api_key: str):
         self.client = OpenAI(api_key=api_key)
         self.batch_creator = BatchCreator(BatchFormatter(), UUIDGenerator())
 
-    # request_batch를 create_and_submit_batch로 변경
     def create_and_submit_batch(
         self, batches: List[Dict[str, Any]], meta_data: Dict[str, Any]
     ):
+        """배치를 생성하고 제출"""
         batch_str = "\n".join([json.dumps(b, ensure_ascii=False) for b in batches])
         gpt_batch_file = self.client.files.create(
             file=batch_str.encode("utf-8"), purpose="batch"
@@ -102,22 +126,22 @@ class BatchProcessor:
         )
         return response
 
-    # list_batch를 list_batches로 변경 (복수형이 더 적절)
     def list_batches(self, limit: int = 100):
+        """배치 목록 조회"""
         return self.client.batches.list(limit=limit).model_dump()
 
-    # check_batch를 get_batch_status로 변경
     def get_batch_status(self, batch_id: str):
+        """배치 상태 확인"""
         retrieved = self.client.batches.retrieve(batch_id).model_dump()
         if retrieved["status"] == "completed":
             print("배치 결과 완료!")
         return retrieved
 
-    # result를 get_batch_results로 변경
     def get_batch_results(self, batch_id: str):
+        """배치 결과 조회"""
         retrieved = self.client.batches.retrieve(batch_id).model_dump()
         if retrieved["status"] != "completed":
-            raise ValueError("아직 완료안되었습니다.")
+            raise ValueError("아직 완료되지 않았습니다.")
         output_file_id = retrieved["output_file_id"]
         contents = [
             json.loads(i)
@@ -131,9 +155,11 @@ class BatchProcessor:
     def make_batch(
         self, prompts: Union[str, List[str]], custom_ids: List[str] = None, **gpt_params
     ) -> List[Dict[str, Any]]:
+        """BatchCreator를 통해 배치 생성"""
         return self.batch_creator.make_batch(prompts, custom_ids, **gpt_params)
 
-    def make_struct_batch(
+    def make_structured_batch(
         self, bodies: List[Dict[str, Any]], custom_ids: List[str] = None
     ) -> List[Dict[str, Any]]:
-        return self.batch_creator.make_struct_batch(bodies, custom_ids)
+        """BatchCreator를 통해 구조화된 배치 생성"""
+        return self.batch_creator.make_structured_batch(bodies, custom_ids)
