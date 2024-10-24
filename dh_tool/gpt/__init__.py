@@ -1,16 +1,14 @@
 from .services.batch_service import BatchProcessor
 from .services.chat_service import (
-    GPTFactory,
     SimpleChatModel,
     HistoryChatModel,
     StructuredChatModel,
-    create_gpt,
 )
-
+from .factories.chat_service_factory import ChatServiceFactory, create_chat_service
 
 __all__ = [
-    "create_gpt",
-    "GPTFactory",
+    "create_chat_service",
+    "ChatServiceFactory",
     "SimpleChatModel",
     "HistoryChatModel",
     "StructuredChatModel",
