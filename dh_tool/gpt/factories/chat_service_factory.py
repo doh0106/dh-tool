@@ -10,6 +10,7 @@ from ..services.chat_service import (
     StructuredChatModel,
     HistoryStructuredChatModel,
 )
+from ..services.async_chat_service import AsyncChatModel, AsyncStructuredChatModel
 
 
 class ChatServiceFactory:
@@ -20,15 +21,29 @@ class ChatServiceFactory:
         model: str,
         params: Dict[str, Any],
         system_prompt: str = "",
+        is_async: bool = False,
     ) -> BaseChatModel:
-        client = openai.OpenAI(api_key=api_key)
+        if is_async:
+            client = openai.AsyncOpenAI(api_key=api_key)
+        else:
+            client = openai.OpenAI(api_key=api_key)
+
         config = ModelConfig(model, params, system_prompt)
+
         if gpt_type == "simple":
-            return SimpleChatModel(client, config)
+            return (
+                SimpleChatModel(client, config)
+                if not is_async
+                else AsyncChatModel(client, config)
+            )
         elif gpt_type == "history":
             return HistoryChatModel(client, config)
         elif gpt_type == "structured":
-            return StructuredChatModel(client, config)
+            return (
+                StructuredChatModel(client, config)
+                if not is_async
+                else AsyncStructuredChatModel(client, config)
+            )
         elif gpt_type == "hs":
             return HistoryStructuredChatModel(client, config)
         else:
@@ -43,6 +58,7 @@ def create_chat_service(
     model: str,
     params: Dict[str, Any] = None,
     system_prompt: str = "",
+    is_async: bool = False,
 ) -> BaseChatModel:
     """
     노트북 환경에서 쉽게 GPT 객체를 생성하는 함수
@@ -52,11 +68,12 @@ def create_chat_service(
     :param model: 사용할 모델 이름
     :param params: 모델 파라미터 (기본값: None)
     :param system_prompt: 시스템 프롬프트 (기본값: "")
+    :param is_async: 비동기 모델 사용 여부 (기본값: False)
     :return: 생성된 GPT 객체
     """
     if params is None:
         params = {}
 
     return ChatServiceFactory.create_chat_service(
-        gpt_type, api_key, model, params, system_prompt
+        gpt_type, api_key, model, params, system_prompt, is_async
     )
