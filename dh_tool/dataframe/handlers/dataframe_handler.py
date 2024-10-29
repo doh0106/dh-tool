@@ -179,10 +179,34 @@ class DataFrameHandler:
 
     def drop_duplicates(self, subset=None, keep="first", inplace=False):
         """중복 행 제거"""
+        df_copy = self.df.copy()
+
+        # 리스트 타입 컬럼이 있는 경우 문자열로 변환
+        if subset is None:
+            list_columns = [
+                col
+                for col in df_copy.columns
+                if df_copy[col].apply(lambda x: isinstance(x, list)).any()
+            ]
+            for col in list_columns:
+                df_copy[col] = df_copy[col].apply(str)
+        else:
+            # subset에 지정된 컬럼만 확인
+            list_columns = [
+                col
+                for col in subset
+                if col in df_copy.columns
+                and df_copy[col].apply(lambda x: isinstance(x, list)).any()
+            ]
+            for col in list_columns:
+                df_copy[col] = df_copy[col].apply(str)
+
+        result = df_copy.drop_duplicates(subset=subset, keep=keep)
+
         if inplace:
-            self.df.drop_duplicates(subset=subset, keep=keep, inplace=True)
+            self.df = result
             return None
-        return self.df.drop_duplicates(subset=subset, keep=keep)
+        return result
 
     def to_datetime(
         self, column: str, format: Optional[str] = None, inplace: bool = False
