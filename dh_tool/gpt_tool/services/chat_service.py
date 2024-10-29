@@ -4,7 +4,6 @@ from typing import List
 from ..core.base import BaseChatModel, HistoryMixin, StructuredOutputMixin, RequestMixin
 from ..core.config import ModelConfig
 from ..models import Message, ChatCompletionRequest
-from ..utils.stream_processor import process_and_convert_stream
 
 
 class SimpleChatModel(BaseChatModel, RequestMixin):

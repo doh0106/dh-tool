@@ -2,6 +2,7 @@ import json
 import numpy as np
 import pandas as pd
 from datetime import datetime
+import warnings
 
 from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
@@ -19,6 +20,7 @@ class ExcelHandler(EventEmitter):
         self.worksheet = self.workbook.active
         self.worksheet.title = "Sheet1"  # 기본 시트 이름 설정
         self.sheet_names = {"Sheet1"}
+        self.add_column_prefix = False  # 접두사 추가 여부 설정
 
     def update(self, dataframe):
         self.df = dataframe
@@ -28,10 +30,12 @@ class ExcelHandler(EventEmitter):
     def _update_worksheet(self):
         self.worksheet.delete_rows(1, self.worksheet.max_row)
 
-        # 열 이름에 접두사 추가 (이미 'col_'로 시작하는 경우 제외)
-        self.df.columns = [
-            col if col.startswith("col_") else f"col_{col}" for col in self.df.columns
-        ]
+        if self.add_column_prefix:
+            # 열 이름에 접두사 추가 (이미 'col_'로 시작하는 경우 제외)
+            self.df.columns = [
+                col if col.startswith("col_") else f"col_{col}"
+                for col in self.df.columns
+            ]
 
         for row in dataframe_to_rows(self.df, index=False, header=True):
             row = [self._convert_to_string_if_needed(cell) for cell in row]
@@ -39,19 +43,26 @@ class ExcelHandler(EventEmitter):
 
     def _convert_to_string_if_needed(self, value):
         """복잡한 데이터 타입을 문자열로 변환"""
-        if isinstance(value, (list, dict)):
-            return json.dumps(value)
-        elif isinstance(value, np.ndarray):
-            return np.array2string(value)
-        elif pd.isna(value):
-            return ""
-        elif isinstance(value, (np.int64, np.float64)):
-            return float(value)
-        elif isinstance(value, datetime):
-            return value.isoformat()
-        elif value in (np.inf, -np.inf):
+        try:
+            if isinstance(value, (dict, list, np.ndarray)):
+                warnings.warn(
+                    f"Complex data type {type(value)} will be converted to string representation"
+                )
+                return str(value)  # json.dumps 대신 str 사용
+            elif pd.isna(value):
+                return ""
+            elif isinstance(value, (np.int64, np.float64)):
+                return float(value)
+            elif isinstance(value, datetime):
+                return value.isoformat()
+            elif value in (np.inf, -np.inf):
+                return str(value)
+            return value
+        except Exception as e:
+            warnings.warn(
+                f"Error converting value {value}: {str(e)}. Using string representation."
+            )
             return str(value)
-        return value
 
     def set_column_width(self, **kwargs):
         """컬럼 너비 설정"""
@@ -159,8 +170,13 @@ class ExcelHandler(EventEmitter):
 
     def df_to_worksheet(self, dataframe):
         """데이터프레임을 현재 워크시트에 추가"""
-        for r in dataframe_to_rows(dataframe, index=False, header=True):
-            self.worksheet.append(r)
+        # 데이터프레임을 rows로 변환
+        rows = dataframe_to_rows(dataframe, index=False, header=True)
+
+        # 각 행의 각 셀에 대해 데이터 타입 변환 적용
+        for row in rows:
+            converted_row = [self._convert_to_string_if_needed(cell) for cell in row]
+            self.worksheet.append(converted_row)
 
     def list_sheets(self):
         """시트 목록 반환"""
