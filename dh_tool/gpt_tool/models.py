@@ -24,7 +24,10 @@ class ChatCompletionRequest(BaseModel):
     seed: Optional[int] = 1
     stream: Optional[bool] = False
     response_format: Optional[Union[ResponseFormat, StructuredResponseFormat]] = None
+
     # 다른 가능한 파라미터들...
+    class Config:
+        extra = "allow"  # 추가 필드 허용
 
 
 class StructuredChatCompletionRequest(ChatCompletionRequest):

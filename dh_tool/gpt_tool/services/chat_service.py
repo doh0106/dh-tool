@@ -14,8 +14,6 @@ class SimpleChatModel(BaseChatModel, RequestMixin):
             self.config.system_prompt, comment
         )
         chat_request = self.create_request(messages)
-        for m in messages:
-            print(m)
         completion = self.client.chat.completions.create(**chat_request.model_dump())
 
         if not return_all:
@@ -27,7 +25,9 @@ class SimpleChatModel(BaseChatModel, RequestMixin):
         messages = self.message_handler.create_messages(
             self.config.system_prompt, comment
         )
-        chat_request = self.create_request(messages, stream=True)
+        chat_request = self.create_request(
+            messages, stream=True, stream_options={"include_usage": True}
+        )
         stream = self.client.chat.completions.create(**chat_request.model_dump())
         completion = process_and_convert_stream(stream, verbose)
 
@@ -49,9 +49,6 @@ class HistoryChatModel(BaseChatModel, HistoryMixin, RequestMixin):
         messages.append({"role": "user", "content": comment})
 
         chat_request = self.create_request(messages)
-        # print(messages)
-        for m in messages:
-            print(m)
         completion = self.client.chat.completions.create(**chat_request.model_dump())
 
         self.add_to_history(comment, completion.choices[0].message.content)
@@ -65,7 +62,9 @@ class HistoryChatModel(BaseChatModel, HistoryMixin, RequestMixin):
         messages = self.get_messages_with_system_prompt(self.config.system_prompt)
         messages.append({"role": "user", "content": comment})
 
-        chat_request = self.create_request(messages, stream=True)
+        chat_request = self.create_request(
+            messages, stream=True, stream_options={"include_usage": True}
+        )
         stream = self.client.chat.completions.create(**chat_request.model_dump())
         completion = process_and_convert_stream(stream, verbose)
 
@@ -107,7 +106,9 @@ class StructuredChatModel(BaseChatModel, StructuredOutputMixin, RequestMixin):
         messages = self.message_handler.create_messages(
             self.config.system_prompt, content
         )
-        chat_request = self.create_structured_request(messages, stream=True)
+        chat_request = self.create_structured_request(
+            messages, stream=True, stream_options={"include_usage": True}
+        )
         stream = self.client.chat.completions.create(**chat_request.model_dump())
         completion = process_and_convert_stream(stream, verbose)
         return self.process_structured_response(completion, return_all)
@@ -148,7 +149,9 @@ class HistoryStructuredChatModel(
         messages = self.get_messages_with_system_prompt(self.config.system_prompt)
         messages.append({"role": "user", "content": content})
 
-        chat_request = self.create_structured_request(messages, stream=True)
+        chat_request = self.create_structured_request(
+            messages, stream=True, stream_options={"include_usage": True}
+        )
         stream = self.client.chat.completions.create(**chat_request.model_dump())
         completion = process_and_convert_stream(stream, verbose)
         response = self.process_structured_response(completion, return_all)
