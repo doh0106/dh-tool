@@ -12,6 +12,7 @@ from ..models import (
     StructuredChatCompletionRequest,
 )
 from ..utils.message_handler import MessageHandler
+from ..utils.stream_processor import process_and_convert_stream
 
 
 class RequestMixin:
@@ -36,13 +37,49 @@ class BaseChatModel(ABC):
         self.model_emb = "text-embedding-3-large"
         self.message_handler = MessageHandler()
 
+    def chat(self, content: str, return_all: bool = False):
+        messages = self._prepare_messages(content)
+        request = self._create_request(messages)
+        completion = self._execute_request(request)
+        self._handle_response(content, completion)
+        return self._process_response(completion, return_all)
+
+    def stream(self, content: str, verbose: bool = True, return_all: bool = False):
+        """Template method for stream completion"""
+        messages = self._prepare_messages(content)
+        request = self._create_request(
+            messages, stream=True, stream_options={"include_usage": True}
+        )
+        stream = self._execute_request(request)
+        completion = process_and_convert_stream(stream, verbose)
+        self._handle_response(content, completion)
+        return self._process_response(completion, return_all)
+
     @abstractmethod
-    def chat(self, comment: str, return_all: bool = False):
+    def _prepare_messages(self, content: str) -> List[Message]:
+        """Prepare messages for the request"""
         pass
 
     @abstractmethod
-    def stream(self, comment: str, verbose: bool = True, return_all: bool = False):
+    def _create_request(
+        self, messages: List[Message], **kwargs
+    ) -> ChatCompletionRequest:
+        """Create request object"""
         pass
+
+    def _execute_request(self, request):
+        """Execute the chat completion request"""
+        return self.client.chat.completions.create(**request.model_dump())
+
+    def _handle_response(self, content: str, completion) -> None:
+        """Handle the response (e.g., save to history)"""
+        pass
+
+    def _process_response(self, completion, return_all: bool):
+        """Process the completion response"""
+        if not return_all:
+            return completion.choices[0].message.content
+        return completion
 
     def embed(self, texts, return_all: bool = False):
         if isinstance(texts, str):
@@ -87,9 +124,6 @@ class HistoryMixin:
         while len(self.history) > self.max_history_length * 2:
             self.history.pop(0)
             self.history.pop(0)
-
-    def get_messages_with_system_prompt(self, system_prompt: str) -> List[Message]:
-        return [{"role": "system", "content": system_prompt}] + self.history
 
 
 class StructuredOutputMixin:

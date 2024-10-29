@@ -1,7 +1,9 @@
 import openai
+from typing import List
 
 from ..core.base import BaseChatModel, HistoryMixin, StructuredOutputMixin, RequestMixin
 from ..core.config import ModelConfig
+from ..models import Message, ChatCompletionRequest
 from ..utils.stream_processor import process_and_convert_stream
 
 
@@ -9,32 +11,13 @@ class SimpleChatModel(BaseChatModel, RequestMixin):
     def __init__(self, client: openai.OpenAI, config: ModelConfig):
         super().__init__(client, config)
 
-    def chat(self, comment: str, return_all: bool = False):
-        messages = self.message_handler.create_messages(
-            self.config.system_prompt, comment
-        )
-        chat_request = self.create_request(messages)
-        completion = self.client.chat.completions.create(**chat_request.model_dump())
+    def _prepare_messages(self, content: str) -> List[Message]:
+        return self.message_handler.create_messages(self.config.system_prompt, content)
 
-        if not return_all:
-            return completion.choices[0].message.content
-        else:
-            return completion
-
-    def stream(self, comment: str, verbose: bool = True, return_all: bool = False):
-        messages = self.message_handler.create_messages(
-            self.config.system_prompt, comment
-        )
-        chat_request = self.create_request(
-            messages, stream=True, stream_options={"include_usage": True}
-        )
-        stream = self.client.chat.completions.create(**chat_request.model_dump())
-        completion = process_and_convert_stream(stream, verbose)
-
-        if not return_all:
-            return completion.choices[0].message.content
-        else:
-            return completion
+    def _create_request(
+        self, messages: List[Message], **kwargs
+    ) -> ChatCompletionRequest:
+        return self.create_request(messages, **kwargs)
 
 
 class HistoryChatModel(BaseChatModel, HistoryMixin, RequestMixin):
@@ -44,43 +27,23 @@ class HistoryChatModel(BaseChatModel, HistoryMixin, RequestMixin):
         BaseChatModel.__init__(self, client, config)
         HistoryMixin.__init__(self, max_history_length)
 
-    def chat(self, comment: str, return_all: bool = False):
-        messages = self.get_messages_with_system_prompt(self.config.system_prompt)
-        messages.append({"role": "user", "content": comment})
-
-        chat_request = self.create_request(messages)
-        completion = self.client.chat.completions.create(**chat_request.model_dump())
-
-        self.add_to_history(comment, completion.choices[0].message.content)
-
-        if not return_all:
-            return completion.choices[0].message.content
-        else:
-            return completion
-
-    def stream(self, comment: str, verbose: bool = True, return_all: bool = False):
-        messages = self.get_messages_with_system_prompt(self.config.system_prompt)
-        messages.append({"role": "user", "content": comment})
-
-        chat_request = self.create_request(
-            messages, stream=True, stream_options={"include_usage": True}
+    def _prepare_messages(self, content: str) -> List[Message]:
+        messages = self.message_handler.create_messages(
+            self.config.system_prompt, content
         )
-        stream = self.client.chat.completions.create(**chat_request.model_dump())
-        completion = process_and_convert_stream(stream, verbose)
-
-        self.add_to_history(comment, completion.choices[0].message.content)
-
-        if not return_all:
-            return completion.choices[0].message.content
+        if self.config.system_prompt:
+            messages.insert(1, self.history)
         else:
-            return completion
+            messages.insert(0, self.history)
+        return messages
 
-    def clear_history(self):
-        self.history = []
+    def _create_request(
+        self, messages: List[Message], **kwargs
+    ) -> ChatCompletionRequest:
+        return self.create_request(messages, **kwargs)
 
-    def add_to_history(self, user_message: str, assistant_message: str):
-        self.history.append({"role": "user", "content": user_message})
-        self.history.append({"role": "assistant", "content": assistant_message})
+    def _handle_response(self, content: str, completion) -> None:
+        self.add_to_history(content, completion.choices[0].message.content)
 
 
 class StructuredChatModel(BaseChatModel, StructuredOutputMixin, RequestMixin):
@@ -89,28 +52,15 @@ class StructuredChatModel(BaseChatModel, StructuredOutputMixin, RequestMixin):
         self.validate_model()
         self.validate_config()
 
-    def chat(self, content: str, return_all: bool = False):
-        messages = self.message_handler.create_messages(
-            self.config.system_prompt, content
-        )
-        chat_request = self.create_structured_request(messages)
-        completion = self.client.chat.completions.create(**chat_request.model_dump())
-        return self.process_structured_response(completion, return_all)
+    def _prepare_messages(self, content: str) -> List[Message]:
+        return self.message_handler.create_messages(self.config.system_prompt, content)
 
-    def stream(
-        self,
-        content: str,
-        verbose: bool = True,
-        return_all: bool = False,
-    ):
-        messages = self.message_handler.create_messages(
-            self.config.system_prompt, content
-        )
-        chat_request = self.create_structured_request(
-            messages, stream=True, stream_options={"include_usage": True}
-        )
-        stream = self.client.chat.completions.create(**chat_request.model_dump())
-        completion = process_and_convert_stream(stream, verbose)
+    def _create_request(
+        self, messages: List[Message], **kwargs
+    ) -> ChatCompletionRequest:
+        return self.create_structured_request(messages, **kwargs)
+
+    def _process_response(self, completion, return_all: bool):
         return self.process_structured_response(completion, return_all)
 
 
@@ -125,36 +75,23 @@ class HistoryStructuredChatModel(
         self.validate_model()
         self.validate_config()
 
-    def chat(
-        self,
-        content: str,
-        return_all: bool = False,
-    ):
-        messages = self.get_messages_with_system_prompt(self.config.system_prompt)
-        messages.append({"role": "user", "content": content})
-
-        chat_request = self.create_structured_request(messages)
-        completion = self.client.chat.completions.create(**chat_request.model_dump())
-        response = self.process_structured_response(completion, return_all)
-
-        self.add_to_history(content, completion.choices[0].message.content)
-        return response
-
-    def stream(
-        self,
-        content: str,
-        verbose: bool = True,
-        return_all: bool = False,
-    ):
-        messages = self.get_messages_with_system_prompt(self.config.system_prompt)
-        messages.append({"role": "user", "content": content})
-
-        chat_request = self.create_structured_request(
-            messages, stream=True, stream_options={"include_usage": True}
+    def _prepare_messages(self, content: str) -> List[Message]:
+        messages = self.message_handler.create_messages(
+            self.config.system_prompt, content
         )
-        stream = self.client.chat.completions.create(**chat_request.model_dump())
-        completion = process_and_convert_stream(stream, verbose)
-        response = self.process_structured_response(completion, return_all)
+        if self.config.system_prompt:
+            messages.insert(1, self.history)
+        else:
+            messages.insert(0, self.history)
+        return messages
 
+    def _create_request(
+        self, messages: List[Message], **kwargs
+    ) -> ChatCompletionRequest:
+        return self.create_structured_request(messages, **kwargs)
+
+    def _handle_response(self, content: str, completion) -> None:
         self.add_to_history(content, completion.choices[0].message.content)
-        return response
+
+    def _process_response(self, completion, return_all: bool):
+        return self.process_structured_response(completion, return_all)
