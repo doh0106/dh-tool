@@ -9,17 +9,21 @@ class DataFrameHandler:
 
     def select_rows(self, include=None, exclude=None, inplace=False):
         def build_condition(column, condition, is_exclude=False):
+            # 컬럼 존재 여부 먼저 확인
+            if column not in self.df.columns:
+                raise KeyError(f"Column '{column}' not found in DataFrame")
+
             operator, value = condition
             if operator in ("==", "!=", "<", ">", "<=", ">="):
                 if is_exclude:
-                    return f"({column} {invert_operator(operator)} {repr(value)})"
+                    return f"({self.df[column].name} {invert_operator(operator)} {repr(value)})"
                 else:
-                    return f"({column} {operator} {repr(value)})"
+                    return f"({self.df[column].name} {operator} {repr(value)})"
             elif operator == "in":
                 if is_exclude:
-                    return f"(~{column}.isin({value}))"
+                    return f"(~{self.df[column].name}.isin({value}))"
                 else:
-                    return f"({column}.isin({value}))"
+                    return f"({self.df[column].name}.isin({value}))"
             elif operator == "contains":
                 if isinstance(self.df[column].iloc[0], (np.ndarray, list)):
                     # 리스트 또는 numpy 배열을 포함하는 경우
@@ -34,9 +38,9 @@ class DataFrameHandler:
                 else:
                     # 일반 문자열 열인 경우
                     if is_exclude:
-                        return f"(~{column}.str.contains({repr(value)}))"
+                        return f"(~{self.df[column].name}.str.contains({repr(value)}))"
                     else:
-                        return f"({column}.str.contains({repr(value)}))"
+                        return f"({self.df[column].name}.str.contains({repr(value)}))"
             else:
                 raise ValueError(f"Unsupported operator: {operator}")
 
