@@ -9,6 +9,14 @@ from ..models import Message, ChatCompletionRequest
 class SimpleChatModel(BaseChatModel, RequestMixin):
     def __init__(self, client: openai.OpenAI, config: ModelConfig):
         super().__init__(client, config)
+        self._validate_config()
+
+    def _validate_config(self):
+        if self.config.params.get("response_format"):
+            raise ValueError(
+                "SimpleChatModel does not support response_format. "
+                "Use StructuredChatModel instead for structured output."
+            )
 
     def _prepare_messages(self, content: str) -> List[Message]:
         return self.message_handler.create_messages(self.config.system_prompt, content)
@@ -25,6 +33,14 @@ class HistoryChatModel(BaseChatModel, HistoryMixin, RequestMixin):
     ):
         BaseChatModel.__init__(self, client, config)
         HistoryMixin.__init__(self, max_history_length)
+        self._validate_config()
+
+    def _validate_config(self):
+        if self.config.params.get("response_format"):
+            raise ValueError(
+                "HistoryChatModel does not support response_format. "
+                "Use HistoryStructuredChatModel instead for structured output."
+            )
 
     def _prepare_messages(self, content: str) -> List[Message]:
         return self.message_handler.create_messages_with_history(
