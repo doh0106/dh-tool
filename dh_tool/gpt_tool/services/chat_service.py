@@ -27,14 +27,9 @@ class HistoryChatModel(BaseChatModel, HistoryMixin, RequestMixin):
         HistoryMixin.__init__(self, max_history_length)
 
     def _prepare_messages(self, content: str) -> List[Message]:
-        messages = self.message_handler.create_messages(
-            self.config.system_prompt, content
+        return self.message_handler.create_messages_with_history(
+            self.config.system_prompt, content, self.history
         )
-        if self.config.system_prompt:
-            messages.insert(1, self.history)
-        else:
-            messages.insert(0, self.history)
-        return messages
 
     def _create_request(
         self, messages: List[Message], **kwargs
@@ -75,14 +70,9 @@ class HistoryStructuredChatModel(
         self.validate_config()
 
     def _prepare_messages(self, content: str) -> List[Message]:
-        messages = self.message_handler.create_messages(
-            self.config.system_prompt, content
+        return self.message_handler.create_messages_with_history(
+            self.config.system_prompt, content, self.history
         )
-        if self.config.system_prompt:
-            messages.insert(1, self.history)
-        else:
-            messages.insert(0, self.history)
-        return messages
 
     def _create_request(
         self, messages: List[Message], **kwargs
