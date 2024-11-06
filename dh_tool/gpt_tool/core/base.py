@@ -84,7 +84,7 @@ class BaseChatModel(ABC):
     def embed(self, texts, return_all: bool = False):
         if isinstance(texts, str):
             texts = [texts]
-        response = self.client.client.embeddings.create(
+        response = self.client.embeddings.create(
             input=texts, model=self.model_emb
         )
         if not return_all:
