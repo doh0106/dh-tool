@@ -40,6 +40,7 @@ class ExcelHandler(EventEmitter):
         for row in dataframe_to_rows(self.df, index=False, header=True):
             row = [self._convert_to_string_if_needed(cell) for cell in row]
             self.worksheet.append(row)
+        self._apply_autowrap()
 
     def _convert_to_string_if_needed(self, value):
         """복잡한 데이터 타입을 문자열로 변환"""
@@ -78,11 +79,18 @@ class ExcelHandler(EventEmitter):
         """첫 번째 행 고정"""
         self.worksheet.freeze_panes = self.worksheet["A2"]
 
-    def enable_autowrap(self):
-        """자동 줄 바꿈 활성화"""
-        for row in self.worksheet.iter_rows():
+    def _apply_autowrap(self):
+        """자동 줄바꿈 스타일 적용"""
+        for row in self.worksheet.iter_rows(min_row=1, max_row=self.worksheet.max_row):
             for cell in row:
-                cell.alignment = Alignment(wrap_text=True)
+                if cell.value:  # 값이 있는 셀에만 적용
+                    cell.alignment = Alignment(
+                        wrap_text=True, vertical="center"
+                    )  # 수직 정렬도 추가
+
+    def enable_autowrap(self):
+        """자동 줄바꿈 활성화"""
+        self._apply_autowrap()
 
     def add_hyperlink(self, cell, url, display=None):
         """셀에 하이퍼링크 추가"""
