@@ -94,11 +94,34 @@ class BaseChatModel(ABC):
 
     @staticmethod
     def calculate_price(
-        prompt_tokens: int,
-        completion_tokens: int,
-        model_name: str,
+        first_param,
+        second_param = None,
+        model_name: str = None,
         exchange_rate: float = 1400,
     ) -> float:
+        """Calculate the price of API usage
+        
+        Overloaded to handle two cases:
+        1. calculate_price(completion)
+        2. calculate_price(prompt_tokens, completion_tokens, model_name)
+        
+        Args:
+            first_param: Either a completion object or prompt_tokens
+            second_param: completion_tokens (when first_param is prompt_tokens)
+            model_name: Required when using token counts directly
+            exchange_rate: Optional exchange rate to local currency
+        """
+        if hasattr(first_param, "model"):  # Completion object case
+            completion = first_param
+            model_name = completion.model
+            prompt_tokens = completion.usage.prompt_tokens
+            completion_tokens = completion.usage.completion_tokens
+        else:  # Token counts case
+            prompt_tokens = first_param
+            completion_tokens = second_param
+            if model_name is None:
+                raise ValueError("model_name is required when providing token counts")
+
         if model_name in MODEL_PRICE:
             token_prices = MODEL_PRICE[model_name]
             return exchange_rate * (
