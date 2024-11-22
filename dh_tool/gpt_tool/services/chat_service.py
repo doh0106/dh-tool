@@ -12,10 +12,14 @@ class SimpleChatModel(BaseChatModel, RequestMixin):
         self._validate_config()
 
     def _validate_config(self):
-        if self.config.params.get("response_format"):
+        response_format = self.config.params.get("response_format")
+        if response_format and not (
+            isinstance(response_format, dict) 
+            and response_format.get("type") == "json_object"
+        ):
             raise ValueError(
-                "SimpleChatModel does not support response_format. "
-                "Use StructuredChatModel instead for structured output."
+                "SimpleChatModel only supports response_format={'type': 'json_object'}. "
+                "Use StructuredChatModel instead for other structured output formats."
             )
 
     def _prepare_messages(self, content: str) -> List[Message]:
@@ -36,10 +40,14 @@ class HistoryChatModel(BaseChatModel, HistoryMixin, RequestMixin):
         self._validate_config()
 
     def _validate_config(self):
-        if self.config.params.get("response_format"):
+        response_format = self.config.params.get("response_format")
+        if response_format and not (
+            isinstance(response_format, dict) 
+            and response_format.get("type") == "json_object"
+        ):
             raise ValueError(
-                "HistoryChatModel does not support response_format. "
-                "Use HistoryStructuredChatModel instead for structured output."
+                "HistoryChatModel only supports response_format={'type': 'json_object'}. "
+                "Use HistoryStructuredChatModel instead for other structured output formats."
             )
 
     def _prepare_messages(self, content: str) -> List[Message]:
