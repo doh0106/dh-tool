@@ -1,19 +1,27 @@
-MODEL_PRICE = {
-    "gpt-3.5-turbo-0125": [0.5 / 1000000, 1.5 / 1000000],
-    "gpt-3.5-turbo-0301": [1.5 / 1000000, 2 / 1000000],
-    "gpt-4": [30 / 1000000, 60 / 1000000],
-    "gpt-4-0125-preview": [10 / 1000000, 30 / 1000000],
-    "gpt-4o": [5 / 1000000, 15 / 1000000],
-    "gpt-4o-2024-05-13": [5 / 1000000, 15 / 1000000],
-    "gpt-4o-2024-08-06": [2.5 / 1000000, 10 / 1000000],
-    "gpt-4o-mini": [0.15 / 1000000, 0.6 / 1000000],
-    "gpt-4o-mini-2024-07-18": [0.15 / 1000000, 0.6 / 1000000],
-}
+import pandas as pd
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+model_price_path = BASE_DIR / "data" / "model_price.csv"
+price_data = pd.read_csv(model_price_path)
+MODEL_PRICE = (
+    price_data.set_index("model")[["prompt_tokens", "completion_tokens"]]
+    .map(lambda x: float(x) / 1_000_000)  # Divide each value by 1,000,000
+    .to_dict(orient="index")
+)
 
 STRUCTURED_OUTPUT_MODELS = [
     "gpt-4o-2024-08-06",
     "gpt-4o-mini",
     "gpt-4o-mini-2024-07-18",
+    "gpt-4o-2024-11-20",
+    "o1",
+    "o1-2024-12-17",
+    "o1-preview",
+    "o1-preview-2024-09-12",
+    "o1-mini",
+    "o1-mini-2024-09-12",
 ]
 
 MY_SYSTEM_PROMPT = (

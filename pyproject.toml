@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dh-tool"
-version = "1.0.27"
+version = "1.0.30"
 authors = [
   { name="dohyun", email="doh0106@naver.com" },
 ]
@@ -33,3 +33,9 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/pypa/sampleproject"
 Issues = "https://github.com/pypa/sampleproject/issues"
+
+[tool.setuptools]
+include-package-data = true  # 데이터 파일 포함
+
+[tool.setuptools.package-data]
+"dh_tool" = ["gpt_tool/data/*.csv"]  # 패키지에 포함할 데이터 파일 경로

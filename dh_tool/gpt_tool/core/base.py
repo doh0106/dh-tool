@@ -84,9 +84,7 @@ class BaseChatModel(ABC):
     def embed(self, texts, return_all: bool = False):
         if isinstance(texts, str):
             texts = [texts]
-        response = self.client.embeddings.create(
-            input=texts, model=self.model_emb
-        )
+        response = self.client.embeddings.create(input=texts, model=self.model_emb)
         if not return_all:
             return [r.embedding for r in response.data]
         else:
@@ -95,16 +93,12 @@ class BaseChatModel(ABC):
     @staticmethod
     def calculate_price(
         first_param,
-        second_param = None,
+        second_param=None,
         model_name: str = None,
         exchange_rate: float = 1400,
     ) -> float:
-        """Calculate the price of API usage
-        
-        Overloaded to handle two cases:
-        1. calculate_price(completion)
-        2. calculate_price(prompt_tokens, completion_tokens, model_name)
-        
+        """Calculate the price of API usage.
+
         Args:
             first_param: Either a completion object or prompt_tokens
             second_param: completion_tokens (when first_param is prompt_tokens)
@@ -116,19 +110,28 @@ class BaseChatModel(ABC):
             model_name = completion.model
             prompt_tokens = completion.usage.prompt_tokens
             completion_tokens = completion.usage.completion_tokens
+            cached_tokens = completion.usage.prompt_tokens_details.cached_tokens
         else:  # Token counts case
             prompt_tokens = first_param
             completion_tokens = second_param
+            cached_tokens = 0  # 기본 값
             if model_name is None:
                 raise ValueError("model_name is required when providing token counts")
 
-        if model_name in MODEL_PRICE:
-            token_prices = MODEL_PRICE[model_name]
-            return exchange_rate * (
-                prompt_tokens * token_prices[0] + completion_tokens * token_prices[1]
-            )
-        print(f"{model_name} not in price dict")
-        return 0
+        if model_name not in MODEL_PRICE:
+            print(f"{model_name} not in price dict")
+            return 0
+
+        # 가격 계산
+        token_prices = MODEL_PRICE[model_name]
+        prompt_price = (prompt_tokens - cached_tokens) * token_prices["prompt_tokens"]
+        completion_price = completion_tokens * token_prices["completion_tokens"]
+
+        # 추가 가격 계산 (예: cached_tokens 처리)
+        cached_price = cached_tokens * token_prices["prompt_tokens"] * 0.5
+
+        total_price = exchange_rate * (prompt_price + completion_price + cached_price)
+        return total_price
 
 
 class HistoryMixin:
