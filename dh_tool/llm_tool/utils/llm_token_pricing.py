@@ -11,7 +11,7 @@ class TokenPriceCalculator:
     LLM 토큰 가격 계산기
     """
 
-    price_data = pd.read_csv(BASE_DIR / "token_price_by_model.csv")
+    price_data = pd.read_csv(BASE_DIR.parent / "data/token_price_by_model.csv")
     _model_price_per_tokens = price_data.set_index("model")[
         ["input", "output", "input_name", "output_name"]
     ].to_dict(orient="index")

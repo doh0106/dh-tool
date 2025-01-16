@@ -4,7 +4,8 @@ import google.generativeai as genai
 from google.generativeai import GenerationConfig
 from google.generativeai.types.generation_types import AsyncGenerateContentResponse
 
-from dh_tool.llm_tool.base import BaseLLM
+from .base import BaseLLM
+from ..utils.response_parser import parse_gemini_response
 
 
 class GeminiModel(BaseLLM):
@@ -28,7 +29,7 @@ class GeminiModel(BaseLLM):
                 # generation_config=self.generation_params,
             )
 
-    async def generate(self, message: str, parsed=True, **kwargs: Any):
+    async def generate(self, message: str, parsed=False, **kwargs: Any):
         generation_params = self.generation_params
         if kwargs:
             for k, v in kwargs.items():
@@ -40,10 +41,9 @@ class GeminiModel(BaseLLM):
             contents=message, generation_config=generation_params
         )
         if parsed:
-            return await self.parse_response(response)
+            return self.parse_response(response)
         return response
 
-    async def parse_response(self, response: AsyncGenerateContentResponse):
-        text = response.candidates[0].content.parts[0].text
-        usage = response.usage_metadata
-        return text, usage
+    @staticmethod
+    def parse_response(response: AsyncGenerateContentResponse):
+        return parse_gemini_response(response)

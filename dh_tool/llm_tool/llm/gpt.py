@@ -6,7 +6,8 @@ from openai import AsyncOpenAI
 from openai.resources.chat.completions import Completions
 from openai.types.completion import Completion
 
-from dh_tool.llm_tool.base import BaseLLM
+from .base import BaseLLM
+from ..utils.response_parser import parse_openai_response
 
 
 signature = inspect.signature(Completions.create)
@@ -27,7 +28,7 @@ class GPTModel(BaseLLM):
     def _setup_client(self):
         self._client = AsyncOpenAI(api_key=self.config.api_key)
 
-    async def generate(self, message: str, parsed=True, **kwargs: Any):
+    async def generate(self, message: str, parsed=False, **kwargs: Any):
         generation_params = self.generation_params
         if kwargs:
             for k, v in kwargs.items():
@@ -52,10 +53,9 @@ class GPTModel(BaseLLM):
         gpt_request = gpt_request_format(message)
         response = await self._client.chat.completions.create(**gpt_request)
         if parsed:
-            return await self.parse_response(response)
+            return self.parse_response(response)
         return response
 
-    async def parse_response(self, response: Completion):
-        text = response.choices[0].message.content
-        usage = response.usage
-        return text, usage
+    @staticmethod
+    def parse_response(response: Completion):
+        return parse_openai_response(response)
