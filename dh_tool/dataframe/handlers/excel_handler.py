@@ -1,3 +1,4 @@
+# dh_tool/dataframe/handlers/excel_handler.py
 import json
 import numpy as np
 import pandas as pd
@@ -24,10 +25,9 @@ class ExcelHandler(EventEmitter):
 
     def update(self, dataframe):
         self.df = dataframe
-        self._update_worksheet()
-        self.emit("data_updated", self.df)
+        self.sync_df_to_worksheet()
 
-    def _update_worksheet(self):
+    def sync_df_to_worksheet(self):
         self.worksheet.delete_rows(1, self.worksheet.max_row)
 
         if self.add_column_prefix:
@@ -40,7 +40,6 @@ class ExcelHandler(EventEmitter):
         for row in dataframe_to_rows(self.df, index=False, header=True):
             row = [self._convert_to_string_if_needed(cell) for cell in row]
             self.worksheet.append(row)
-        self._apply_autowrap()
 
     def _convert_to_string_if_needed(self, value):
         """복잡한 데이터 타입을 문자열로 변환"""
@@ -159,7 +158,6 @@ class ExcelHandler(EventEmitter):
                     self.df[col] = self.df[col].apply(json.loads)
                 except:
                     pass
-
                 try:
                     # 날짜 형식 문자열을 datetime 객체로 변환 시도
                     self.df[col] = pd.to_datetime(self.df[col])

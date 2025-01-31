@@ -1,3 +1,4 @@
+# dh_tool/gpt_tool/__init__.py
 from .core import *
 from .core import __all__ as core__all__
 from .services.batch_service import BatchProcessor

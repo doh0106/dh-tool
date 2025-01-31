@@ -1,3 +1,4 @@
+# dh_tool/common/__init__.py
 import glob
 import json
 import os
@@ -17,6 +18,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import sklearn
 from tqdm import tqdm
+
+from .utils import create_daily_folder
 
 tqdm.pandas()
 
@@ -39,4 +42,5 @@ __all__ = [
     "sys",
     "time",
     "tqdm",
+    "create_daily_folder",
 ]

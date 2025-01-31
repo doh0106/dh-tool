@@ -1,4 +1,4 @@
-# src/app/infrastructure/llm/gpt.py
+# dh_tool/llm_tool/llm/gpt.py
 import inspect
 from typing import Any
 
