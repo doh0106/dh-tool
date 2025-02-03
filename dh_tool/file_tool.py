@@ -236,6 +236,7 @@ class FileHandlerFactory:
     def create_handler(file_type: str) -> FileHandler:
         handlers = {
             "txt": TextFileHandler(),
+            "md": TextFileHandler(),
             "json": JsonFileHandler(),
             "csv": CsvFileHandler(),
             "xlsx": ExcelFileHandler(),

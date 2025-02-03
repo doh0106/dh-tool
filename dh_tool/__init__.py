@@ -9,6 +9,8 @@ from .es_tool import *
 from .es_tool import __all__ as es_tool__all__
 from .file_tool import load, save
 from .llm_tool import __all__ as llm__all__
+from .excel import *
+from .excel import __all__ as excel__all__
 
 __all__ = (
     gpt__all__
@@ -16,5 +18,6 @@ __all__ = (
     + dataframe__all__
     + gpt__all__
     + es_tool__all__
+    + excel__all__
     + ["load", "save"]
 )
