@@ -18,6 +18,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import sklearn
 from tqdm import tqdm
+from dotenv import load_dotenv
+
+# load_dotenv("")
 
 from .utils import create_daily_folder
 
@@ -43,4 +46,5 @@ __all__ = [
     "time",
     "tqdm",
     "create_daily_folder",
+    "load_dotenv",
 ]

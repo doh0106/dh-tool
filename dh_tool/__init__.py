@@ -11,6 +11,8 @@ from .file_tool import load, save
 from .llm_tool import __all__ as llm__all__
 from .excel import *
 from .excel import __all__ as excel__all__
+from .log_tool import *
+from .log_tool import __all__ as log__all__
 
 __all__ = (
     gpt__all__
@@ -19,5 +21,6 @@ __all__ = (
     + gpt__all__
     + es_tool__all__
     + excel__all__
+    + llm__all__
     + ["load", "save"]
 )
