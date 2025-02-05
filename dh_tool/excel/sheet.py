@@ -59,7 +59,8 @@ class Sheet:
             font={"name": "Calibri", "size": 14, "bold": True},
             border="medium",
             color="FFFF00",
-            auto_adjust_columns=True
+            auto_adjust_columns=True,
+            filter=True,
         )
         """
         if kwargs.get("auto_wrap") and kwargs.get("auto_adjust_columns"):
@@ -94,6 +95,12 @@ class Sheet:
 
         if kwargs.get("color"):
             Style.apply_color(self.worksheet, kwargs["color"])
+
+        if kwargs.get("filter"):
+            filter_columns = (
+                kwargs["filter"] if isinstance(kwargs["filter"], list) else None
+            )
+            Style.apply_auto_filter(self.worksheet, filter_columns)
 
         return self
 
