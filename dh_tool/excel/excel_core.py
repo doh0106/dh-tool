@@ -38,6 +38,19 @@ class ExcelCore:
             default_sheet = self.workbook.active
             self.workbook.remove(default_sheet)
 
+    def __enter__(self):
+        print("ExcelCore opened.")
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type:  # ❌ 예외 발생 시 롤백
+            print(f"Exception occurred: {exc_value}, rolling back...")
+            self.rollback()
+        else:  # ✅ 예외 없으면 커밋
+            print("No errors, committing changes.")
+            self.commit()
+        self.close()  # with 블록 종료 시 리소스 정리
+
     @property
     def sheet_names(self):
         return self.workbook.sheetnames
@@ -126,6 +139,12 @@ class ExcelCore:
     def style(self, **kwargs):
         if self.active_sheet:
             self.active_sheet.style(**kwargs)
+        return self
+
+    @transactional
+    def style_to_cells(self, cells, **kwargs):
+        if self.active_sheet:
+            self.active_sheet.style_to_cells(cells, **kwargs)
         return self
 
     @transactional

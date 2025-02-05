@@ -42,7 +42,7 @@ def get_column_indices_by_condition(worksheet, condition):
 
 def get_cell_addresses(df, condition):
     """
-    DataFrame과 조건을 받아 조건을 만족하는 셀의 주소(A1, B2 등)를 반환
+    ✅ DataFrame과 조건을 받아 조건을 만족하는 셀의 주소(A1, B2 등)를 반환
     - df: pandas DataFrame
     - condition: 불리언 Series 또는 DataFrame
     """
@@ -50,24 +50,24 @@ def get_cell_addresses(df, condition):
 
     # ✅ 1. Series인 경우 (특정 컬럼에만 조건 적용)
     if isinstance(condition, pd.Series):
-        col_name = condition.name  # 조건이 적용된 컬럼 이름
-        col_idx = df.columns.get_loc(col_name)  # 해당 컬럼의 인덱스 (0부터 시작)
-        col_letter = chr(65 + col_idx)  # A, B, C ... (엑셀 열 이름)
+        col_name = condition.name
+        col_idx = df.columns.get_loc(col_name)
+        col_letter = get_column_letter(col_idx + 1)  # A, B, ..., Z, AA, AB 지원
 
         # 조건이 True인 경우 해당 셀 주소 저장
-        for row_idx, match in condition.items():
+        for row_offset, (row_idx, match) in enumerate(condition.fillna(False).items()):
             if match:
-                excel_row = row_idx + 2  # 헤더가 1행, 데이터는 2행부터 시작
-                cell_ref = f"{col_letter}{excel_row}"  # 셀 주소 (예: B2)
+                excel_row = row_offset + 2  # 헤더가 1행, 데이터는 2행부터 시작
+                cell_ref = f"{col_letter}{excel_row}"
                 cells.append(cell_ref)
 
     # ✅ 2. DataFrame인 경우 (여러 컬럼에 조건 적용)
     elif isinstance(condition, pd.DataFrame):
-        for row_idx, row in condition.iterrows():
+        for row_offset, (row_idx, row) in enumerate(condition.fillna(False).iterrows()):
             for col_idx, match in enumerate(row):
                 if match:
-                    col_letter = chr(65 + col_idx)
-                    excel_row = row_idx + 2
+                    col_letter = get_column_letter(col_idx + 1)
+                    excel_row = row_offset + 2
                     cell_ref = f"{col_letter}{excel_row}"
                     cells.append(cell_ref)
 
@@ -105,3 +105,25 @@ def find_columns_by_type(worksheet, data_type):
             type_columns.append(headers[idx - 1])
 
     return type_columns
+
+
+def apply_to_cells(style_func):
+    """
+    ✅ 셀 범위에 따라 스타일 적용을 제어하는 데코레이터
+    - cells=None → 전체 워크시트에 스타일 적용
+    - cells=[...] → 특정 셀에만 스타일 적용
+    """
+
+    def wrapper(worksheet, *args, cells=None, **kwargs):
+        if cells:  # ✅ 특정 셀에만 적용
+            for cell_ref in cells:
+                cell = worksheet[cell_ref]
+                style_func(cell, *args, **kwargs)
+        else:  # ✅ 전체 워크시트에 적용
+            for row in worksheet.iter_rows():
+                for cell in row:
+                    if cell.value:
+                        style_func(cell, *args, **kwargs)
+        return worksheet
+
+    return wrapper

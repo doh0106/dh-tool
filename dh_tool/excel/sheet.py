@@ -1,5 +1,8 @@
 import pandas as pd
+from openpyxl.utils import get_column_letter
 from openpyxl.utils.dataframe import dataframe_to_rows
+
+
 from .style import Style
 from .dataframe_manager import DataFrameManager
 
@@ -104,6 +107,79 @@ class Sheet:
 
         return self
 
+    def style_to_cells(self, cells, **kwargs):
+        """
+        다양한 엑셀 스타일을 적용합니다.
+
+        ## ✅ 사용 가능한 옵션:
+        - `auto_wrap` (bool): 텍스트 자동 줄바꿈 활성화
+        - `freeze_first_row` (bool): 첫 번째 행 고정
+        - `column_widths` (dict): 열 너비 설정 (예: {"A": 20, "name": 15})
+        - `font` (dict): 폰트 설정
+            - `name` (str): 폰트 이름 (기본값: "Arial")
+            - `size` (int): 폰트 크기 (기본값: 12)
+            - `bold` (bool): 굵은 글씨 여부 (기본값: False)
+            - `italic` (bool): 이탤릭 여부 (기본값: False)
+        - `border` (str): 테두리 스타일 ("thin", "medium", "dashed" 등)
+        - `color` (str): 셀 배경색 (16진수 색상 코드, 예: "FFFF00")
+        - `auto_adjust_columns` (bool): 데이터 길이에 따라 열 너비 자동 조정
+
+        ## ✅ 사용 예제:
+        sheet.style(
+            auto_wrap=True,
+            freeze_first_row=True,
+            column_widths={"name": 20, "age": 15},
+            font={"name": "Calibri", "size": 14, "bold": True},
+            border="medium",
+            color="FFFF00",
+            auto_adjust_columns=True,
+            filter=True,
+        )
+        """
+        if kwargs.get("auto_wrap") and kwargs.get("auto_adjust_columns"):
+            raise ValueError(
+                "auto_wrap과 auto_adjust_columns는 함께 사용할 수 없습니다."
+            )
+        if kwargs.get("auto_wrap"):
+            Style.apply_auto_wrap(self.worksheet)
+
+        if kwargs.get("freeze_first_row"):
+            Style.freeze_first_row(self.worksheet)
+
+        # if "column_widths" in kwargs:
+        if kwargs.get("column_widths"):
+            Style.set_column_width(self.worksheet, kwargs["column_widths"])
+
+        if kwargs.get("auto_adjust_columns"):
+            Style.auto_adjust_column_widths(self.worksheet)
+
+        if kwargs.get("font"):
+            font_options = kwargs["font"]
+            Style.set_font(
+                worksheet=self.worksheet,
+                font_name=font_options.get("name", "Arial"),
+                font_size=font_options.get("size", 12),
+                bold=font_options.get("bold", False),
+                italic=font_options.get("italic", False),
+                cells=cells,
+            )
+
+        if kwargs.get("border"):
+            Style.apply_border(
+                self.worksheet, border_style=kwargs["border"], cells=cells
+            )
+
+        if kwargs.get("color"):
+            Style.apply_color(self.worksheet, kwargs["color"], cells=cells)
+
+        if kwargs.get("filter"):
+            filter_columns = (
+                kwargs["filter"] if isinstance(kwargs["filter"], list) else None
+            )
+            Style.apply_auto_filter(self.worksheet, filter_columns)
+
+        return self
+
     # ✅ 1. 셀에 하이퍼링크 추가
     def add_hyperlink(self, cell, url, display=None):
         """특정 셀에 하이퍼링크 추가"""
@@ -130,7 +206,8 @@ class Sheet:
         for i, url in enumerate(
             urls, start=2
         ):  # start=2 → 헤더를 제외하고 2행부터 시작
-            cell = f"{chr(64 + col_idx)}{i}"  # A, B, C 열 등으로 변환
+            cell = f"{get_column_letter(col_idx)}{i}"  # A, B, C 열 등으로 변환
+            # cell = f"{chr(64 + col_idx)}{i}"  # A, B, C 열 등으로 변환
             display = display_texts[i - 2] if display_texts else None
             self.add_hyperlink(cell, url, display)
 

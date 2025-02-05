@@ -1,7 +1,7 @@
 from openpyxl.styles import Alignment, PatternFill, Font, Border, Side
 from openpyxl.utils import get_column_letter
 
-from .utils import map_column_names_to_letters
+from .utils import map_column_names_to_letters, apply_to_cells
 
 COLOR_MAP = {
     "black": "000000",
@@ -55,45 +55,6 @@ class Style:
             worksheet.column_dimensions[col_letter].width = adjusted_width
 
     @staticmethod
-    def set_font(worksheet, font_name="Arial", font_size=12, bold=False, italic=False):
-        font = Font(name=font_name, size=font_size, bold=bold, italic=italic)
-        for row in worksheet.iter_rows(min_row=1, max_row=1):
-            for cell in row:
-                cell.font = font
-
-    @staticmethod
-    def apply_border(worksheet, border_style="thin"):
-        border = Border(
-            left=Side(style=border_style),
-            right=Side(style=border_style),
-            top=Side(style=border_style),
-            bottom=Side(style=border_style),
-        )
-        for row in worksheet.iter_rows():
-            for cell in row:
-                cell.border = border
-
-    @staticmethod
-    def apply_color(worksheet, color):
-        """
-        셀 배경색 적용
-        - 16진수 색상 코드("FFFF00") 또는 색상 이름("red") 지원
-        """
-        # ✅ 색상 이름을 16진수로 변환
-        if color.lower() in COLOR_MAP:
-            color = COLOR_MAP[color.lower()]
-
-        # ✅ 16진수 형식 보정
-        if not color.startswith("#") and len(color) == 6:
-            color = f"FF{color}"  # openpyxl은 ARGB 포맷을 사용
-
-        fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
-        for row in worksheet.iter_rows():
-            for cell in row:
-                if cell.value:
-                    cell.fill = fill
-
-    @staticmethod
     def apply_auto_filter(worksheet, columns=None):
         """
         데이터 필터 적용
@@ -120,3 +81,48 @@ class Style:
             col_letters = [get_column_letter(idx) for idx in col_indices]
             ref_range = f"{col_letters[0]}1:{col_letters[-1]}{max_row}"
             worksheet.auto_filter.ref = ref_range
+
+    @staticmethod
+    @apply_to_cells
+    def set_font(cell, font_name="Arial", font_size=12, bold=False, italic=False):
+        font = Font(name=font_name, size=font_size, bold=bold, italic=italic)
+        cell.font = font
+        # for row in worksheet.iter_rows(min_row=1, max_row=1):
+        #     for cell in row:
+        #         cell.font = font
+
+    @staticmethod
+    @apply_to_cells
+    def apply_border(cell, border_style="thin"):
+        border = Border(
+            left=Side(style=border_style),
+            right=Side(style=border_style),
+            top=Side(style=border_style),
+            bottom=Side(style=border_style),
+        )
+        cell.border = border
+        # for row in worksheet.iter_rows():
+        #     for cell in row:
+        #         cell.border = border
+
+    @staticmethod
+    @apply_to_cells
+    def apply_color(cell, color):
+        """
+        셀 배경색 적용
+        - 16진수 색상 코드("FFFF00") 또는 색상 이름("red") 지원
+        """
+        # ✅ 색상 이름을 16진수로 변환
+        if color.lower() in COLOR_MAP:
+            color = COLOR_MAP[color.lower()]
+
+        # ✅ 16진수 형식 보정
+        if not color.startswith("#") and len(color) == 6:
+            color = f"FF{color}"  # openpyxl은 ARGB 포맷을 사용
+
+        fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
+        cell.fill = fill
+        # for row in worksheet.iter_rows():
+        #     for cell in row:
+        #         if cell.value:
+        #             cell.fill = fill
