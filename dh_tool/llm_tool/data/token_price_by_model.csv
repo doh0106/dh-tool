@@ -17,3 +17,5 @@ o1-mini,openai,3,12,prompt_tokens,completion_tokens
 o1-mini-2024-09-12,openai,3,12,prompt_tokens,completion_tokens
 gemini-1.5-flash,google,0.075,0.3,prompt_token_count,candidates_token_count
 gemini-1.5-pro,google,1.5,5,prompt_token_count,candidates_token_count
+gemini-2.0-flash,google,0.1,0.4,prompt_token_count,candidates_token_count
+gemini-2.0-flash-light,google,0.075,0.3,prompt_token_count,candidates_token_count
