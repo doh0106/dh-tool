@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dh-tool"
-version = "1.0.48"
+version = "1.0.49"
 authors = [
   { name="dohyun", email="doh0106@naver.com" },
 ]

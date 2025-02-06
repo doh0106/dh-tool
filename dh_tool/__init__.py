@@ -8,6 +8,7 @@ from .gpt_tool import __all__ as gpt__all__
 from .es_tool import *
 from .es_tool import __all__ as es_tool__all__
 from .file_tool import load, save
+from .llm_tool import *
 from .llm_tool import __all__ as llm__all__
 from .excel import *
 from .excel import __all__ as excel__all__
