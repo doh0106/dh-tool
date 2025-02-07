@@ -183,8 +183,9 @@ class Sheet:
     # ✅ 1. 셀에 하이퍼링크 추가
     def add_hyperlink(self, cell, url, display=None):
         """특정 셀에 하이퍼링크 추가"""
+        current_value = self.worksheet[cell].value  # 기존 셀 값 저장
         self.worksheet[cell].hyperlink = url
-        self.worksheet[cell].value = display if display else url
+        self.worksheet[cell].value = display if display is not None else current_value
         self.worksheet[cell].style = "Hyperlink"
         return self
 
