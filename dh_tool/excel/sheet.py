@@ -73,8 +73,8 @@ class Sheet:
         if kwargs.get("auto_wrap"):
             Style.apply_auto_wrap(self.worksheet)
 
-        if kwargs.get("freeze_first_row"):
-            Style.freeze_first_row(self.worksheet)
+        if kwargs.get("freeze_panes"):
+            Style.freeze_panes(self.worksheet, kwargs["freeze_panes"])
 
         # if "column_widths" in kwargs:
         if kwargs.get("column_widths"):
@@ -143,8 +143,8 @@ class Sheet:
         if kwargs.get("auto_wrap"):
             Style.apply_auto_wrap(self.worksheet)
 
-        if kwargs.get("freeze_first_row"):
-            Style.freeze_first_row(self.worksheet)
+        if kwargs.get("freeze_panes"):
+            Style.freeze_panes(self.worksheet, kwargs["freeze_panes"])
 
         # if "column_widths" in kwargs:
         if kwargs.get("column_widths"):

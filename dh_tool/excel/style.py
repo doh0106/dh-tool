@@ -2,24 +2,7 @@ from openpyxl.styles import Alignment, PatternFill, Font, Border, Side
 from openpyxl.utils import get_column_letter
 
 from .utils import map_column_names_to_letters, apply_to_cells
-
-COLOR_MAP = {
-    "black": "000000",
-    "white": "FFFFFF",
-    "red": "FF0000",
-    "green": "00FF00",
-    "blue": "0000FF",
-    "yellow": "FFFF00",
-    "cyan": "00FFFF",
-    "magenta": "FF00FF",
-    "gray": "808080",
-    "orange": "FFA500",
-    "purple": "800080",
-    "pink": "FFC0CB",
-    "brown": "A52A2A",
-    "gold": "FFD700",
-    "silver": "C0C0C0",
-}
+from .config import COLOR_MAP
 
 
 class Style:
@@ -32,8 +15,10 @@ class Style:
                     cell.alignment = Alignment(wrap_text=True, vertical="center")
 
     @staticmethod
-    def freeze_first_row(worksheet):
-        worksheet.freeze_panes = worksheet["A2"]
+    def freeze_panes(worksheet, freeze_pane):
+        """엑셀 창 고정"""
+        if freeze_pane:
+            worksheet.freeze_panes = freeze_pane
 
     @staticmethod
     def set_column_width(worksheet, width_map):
@@ -127,96 +112,35 @@ class Style:
         #         if cell.value:
         #             cell.fill = fill
 
+    @staticmethod
+    @apply_to_cells
+    def set_alignment(cell, alignment="left"):
+        """텍스트 정렬 (left, center, right)"""
+        align_map = {"left": "left", "center": "center", "right": "right"}
+        align = Alignment(horizontal=align_map.get(alignment, "left"))
+        cell.alignment = align
 
-MY_COLOR_MAP = {
-    "pastel_blue": {
-        "name": "Pastel Blue",
-        "hex": "#E3F2FD",
-        "argb": "FFE3F2FD",
-        "category": "blue",
-    },
-    "soft_blue": {
-        "name": "Soft Blue",
-        "hex": "#BBDEFB",
-        "argb": "FFBBDEFB",
-        "category": "blue",
-    },
-    "deep_blue": {
-        "name": "Deep Blue",
-        "hex": "#90CAF9",
-        "argb": "FF90CAF9",
-        "category": "blue",
-    },
-    "pastel_pink": {
-        "name": "Pastel Pink",
-        "hex": "#FCE4EC",
-        "argb": "FFFCE4EC",
-        "category": "pink",
-    },
-    "soft_pink": {
-        "name": "Soft Pink",
-        "hex": "#F8BBD0",
-        "argb": "FFF8BBD0",
-        "category": "pink",
-    },
-    "deep_pink": {
-        "name": "Deep Pink",
-        "hex": "#F48FB1",
-        "argb": "FFF48FB1",
-        "category": "pink",
-    },
-    "pastel_mint": {
-        "name": "Pastel Mint",
-        "hex": "#E8F5E9",
-        "argb": "FFE8F5E9",
-        "category": "mint",
-    },
-    "soft_mint": {
-        "name": "Soft Mint",
-        "hex": "#C8E6C9",
-        "argb": "FFC8E6C9",
-        "category": "mint",
-    },
-    "deep_mint": {
-        "name": "Deep Mint",
-        "hex": "#A5D6A7",
-        "argb": "FFA5D6A7",
-        "category": "mint",
-    },
-    "pastel_yellow": {
-        "name": "Pastel Yellow",
-        "hex": "#FFFDE7",
-        "argb": "FFFFFDE7",
-        "category": "yellow",
-    },
-    "soft_yellow": {
-        "name": "Soft Yellow",
-        "hex": "#FFF9C4",
-        "argb": "FFFFF9C4",
-        "category": "yellow",
-    },
-    "deep_yellow": {
-        "name": "Deep Yellow",
-        "hex": "#FFF59D",
-        "argb": "FFFFF59D",
-        "category": "yellow",
-    },
-    "pastel_purple": {
-        "name": "Pastel Purple",
-        "hex": "#F3E5F5",
-        "argb": "FFF3E5F5",
-        "category": "purple",
-    },
-    "soft_purple": {
-        "name": "Soft Purple",
-        "hex": "#E1BEE7",
-        "argb": "FFE1BEE7",
-        "category": "purple",
-    },
-    "deep_purple": {
-        "name": "Deep Purple",
-        "hex": "#CE93D8",
-        "argb": "FFCE93D8",
-        "category": "purple",
-    },
-}
+    @staticmethod
+    @apply_to_cells
+    def set_number_format(cell, format_str):
+        """숫자 형식 지정"""
+        if isinstance(cell.value, (int, float)):
+            cell.number_format = format_str
+
+    # @staticmethod
+    # def set_row_heights(worksheet, row_heights):
+    #     """행 높이 설정"""
+    #     if row_heights:
+    #         for row, height in row_heights.items():
+    #             worksheet.row_dimensions[row].height = height
+
+    # @staticmethod
+    # def highlight_rows(worksheet, row_colors):
+    #     """특정 행 배경색 적용"""
+    #     if row_colors:
+    #         for row, color in row_colors.items():
+    #             fill = PatternFill(
+    #                 start_color=color, end_color=color, fill_type="solid"
+    #             )
+    #             for cell in worksheet[row]:
+    #                 cell.fill = fill

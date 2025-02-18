@@ -45,6 +45,23 @@ class GeminiModel(BaseLLM):
             return self.parse_response(response)
         return response
 
+    async def generate_stream(self, message: str, parsed=False, **kwargs: Any):
+        generation_params = self.generation_params
+        if kwargs:
+            for k, v in kwargs.items():
+                if k not in self._allowed_generation_params:
+                    raise ValueError(f"Parameter '{k}' is not allowed.")
+            generation_params.update(**kwargs)
+        # generation_params.update(stream=True)
+        print(generation_params)
+
+        response = await self._client.generate_content_async(
+            contents=message, generation_config=generation_params, stream=True
+        )
+        if parsed:
+            return self.parse_response(response)
+        return response
+
     @staticmethod
     def parse_response(response: AsyncGenerateContentResponse):
         return parse_gemini_response(response)

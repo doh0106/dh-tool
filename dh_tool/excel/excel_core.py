@@ -2,10 +2,12 @@ import copy
 from functools import wraps
 
 import pandas as pd
-from openpyxl.utils.dataframe import dataframe_to_rows
+
+# from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl import Workbook
 
 from .sheet import Sheet
+from .config import DEFAULT_STYLES
 
 
 def transactional(method):
@@ -15,7 +17,8 @@ def transactional(method):
     def wrapper(self, *args, **kwargs):
         if not hasattr(self, "_backup") or self._backup is None:
             self._backup = copy.deepcopy(self.workbook)  # ✅ 백업 생성
-            print(f"Transaction started for {method.__name__}")
+            if getattr(self, "verbose", False):
+                print(f"Transaction started for {method.__name__}")
         try:
             result = method(self, *args, **kwargs)  # 메서드 실행
             return result
@@ -28,18 +31,20 @@ def transactional(method):
 
 
 class ExcelCore:
-    def __init__(self, filename=None, remove_default_sheet=True):
+    def __init__(self, filename=None, remove_default_sheet=True, verbose=False):
         self.workbook = Workbook()
         self.filename = filename or "untitled.xlsx"
         self.active_sheet = None
         self._backup = None  # ✅ 백업 저장소
+        self.verbose = verbose  # 로그 출력 여부
 
         if remove_default_sheet:
             default_sheet = self.workbook.active
             self.workbook.remove(default_sheet)
 
     def __enter__(self):
-        print("ExcelCore opened.")
+        if self.verbose:
+            print("ExcelCore opened.")
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -47,7 +52,8 @@ class ExcelCore:
             print(f"Exception occurred: {exc_value}, rolling back...")
             self.rollback()
         else:  # ✅ 예외 없으면 커밋
-            print("No errors, committing changes.")
+            if self.verbose:
+                print("No errors, committing changes.")
             self.commit()
         self.close()  # with 블록 종료 시 리소스 정리
 
@@ -83,22 +89,42 @@ class ExcelCore:
             self.workbook = self._backup
             self.active_sheet = None
             self._backup = None
-            print("Transaction rolled back.")
+            if self.verbose:
+                print("Transaction rolled back.")
         return self
 
     def commit(self):
         """커밋: 백업 삭제"""
         self._backup = None
-        print("Transaction committed.")
+        if self.verbose:
+            print("Transaction committed.")
         return self
 
     @transactional
-    def write(self, sheet_name, data):
+    def write(self, data, sheet_name=None, style_preset=False):
+        """데이터를 시트에 기록, sheet_name이 없으면 자동으로 'Sheet1', 'Sheet2', ... 등 생성"""
+        # 자동으로 중복되지 않는 sheet_name 찾기
+        if sheet_name is None:
+            base_name = "Sheet"
+            existing_sheets = set(self.workbook.sheetnames)
+            index = 1
+            while f"{base_name}{index}" in existing_sheets:
+                index += 1
+            sheet_name = f"{base_name}{index}"  # 중복되지 않는 시트명 결정
+
+        # 시트가 없으면 생성
         if sheet_name not in self.workbook.sheetnames:
             self.workbook.create_sheet(sheet_name)
+
+        # 데이터 쓰기
         sheet = Sheet(self.workbook[sheet_name])
         sheet.write(data)
+        # 스타일 적용 여부
+        if style_preset:
+            sheet.style(**DEFAULT_STYLES)
         self.active_sheet = sheet
+        if self.verbose:
+            print(f"Written data to sheet '{sheet_name}'")
         return self
 
     @transactional
@@ -117,7 +143,8 @@ class ExcelCore:
         # 시트 삭제
         sheet_to_remove = self.workbook[sheet_name]
         self.workbook.remove(sheet_to_remove)
-        print(f"Removed sheet: {sheet_name}")
+        if self.verbose:
+            print(f"Removed sheet: {sheet_name}")
 
         # 삭제된 시트가 활성 시트였을 경우, 다른 시트를 활성화
         if self.active_sheet and self.active_sheet.worksheet.title == sheet_name:
@@ -156,17 +183,20 @@ class ExcelCore:
     @transactional
     def save(self, filename=None):
         self.workbook.save(filename or self.filename)
-        print(f"Saved to {filename or self.filename}")
+        if self.verbose:
+            print(f"Saved to {filename or self.filename}")
         self.commit()  # ✅ 저장 성공 시 커밋
         self.close()
         return self
 
     def end(self):
         # self.commit()
-        print("End of chain.")
+        if self.verbose:
+            print("End of chain.")
         return None
 
     def close(self):
         self.workbook = None
         self.active_sheet = None
-        print("Workbook closed and resources released.")
+        if self.verbose:
+            print("Workbook closed and resources released.")

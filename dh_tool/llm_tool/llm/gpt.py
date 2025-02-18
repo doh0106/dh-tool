@@ -56,6 +56,38 @@ class GPTModel(BaseLLM):
             return self.parse_response(response)
         return response
 
+    async def generate_stream(self, message: str, parsed=False, **kwargs: Any):
+        generation_params = self.generation_params
+        if kwargs:
+            for k, v in kwargs.items():
+                if k not in self._allowed_generation_params:
+                    raise ValueError(f"Parameter '{k}' is not allowed.")
+            generation_params.update(**kwargs)
+        generation_params.update(
+            stream=True,
+            stream_options={"include_usage": True},
+        )
+
+        def gpt_request_format(message):
+            return {
+                "model": self.model,
+                "messages": (
+                    [
+                        {"role": "system", "content": self.system_instruction},
+                        {"role": "user", "content": message},
+                    ]
+                    if self.system_instruction
+                    else [{"role": "user", "content": message}]
+                ),
+                **generation_params,
+            }
+
+        gpt_request = gpt_request_format(message)
+        response = await self._client.chat.completions.create(**gpt_request)
+        if parsed:
+            return self.parse_response(response)
+        return response
+
     @staticmethod
     def parse_response(response: Completion):
         return parse_openai_response(response)

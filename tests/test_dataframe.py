@@ -88,7 +88,7 @@ def test_excel_styling(sample_df, tmp_path):
     sheets.set_column_width(A=20, B=15)
 
     # Test freezing first row
-    sheets.freeze_first_row()
+    # sheets.freeze_first_row()
 
     # Test enabling auto wrap
     sheets.enable_autowrap()

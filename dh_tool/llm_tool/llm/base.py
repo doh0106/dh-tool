@@ -50,6 +50,10 @@ class BaseLLM(ABC):
         pass
 
     @abstractmethod
+    async def generate_stream(self, message: str, parsed=True, **kwargs):
+        pass
+
+    @abstractmethod
     async def parse_response(self):
         pass
 
