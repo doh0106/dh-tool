@@ -68,13 +68,14 @@ class BaseLLM(ABC):
         for key, value in self.config.__dict__.items():
             if key != "generation_params":
                 setattr(self, f"_{key}", value)
-
         # generation_params 필터링
-        self._generation_params = {
-            k: v
-            for k, v in self.config.generation_params.items()
-            if k in self._allowed_generation_params
-        }
+        self._generation_params = {}
+        for key, value in self.config.generation_params.items():
+            if key in self._allowed_generation_params:
+                self._generation_params[key] = value
+            else:
+                print(f"Parameter '{key}' is not allowed.")
+                print(f"Allowed parameters: {self._allowed_generation_params}")
 
     @property
     def generation_params(self) -> Dict[str, Any]:
