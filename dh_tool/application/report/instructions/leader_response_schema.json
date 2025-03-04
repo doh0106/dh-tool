@@ -1,0 +1,32 @@
+{
+    "type": "object",
+    "properties": {
+        "simple_code_analysis": {
+            "type": "string",
+            "description": "간단한 주어진 코드의 분석"
+        },
+        "roles": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "role": {
+                        "type": "string"
+                    },
+                    "analysis_topic": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "purpose": {
+                        "type": "string"
+                    },
+                    "expected_outcomes": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    }
+}
