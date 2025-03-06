@@ -105,6 +105,9 @@ class Sheet:
             )
             Style.apply_auto_filter(self.worksheet, filter_columns)
 
+        if kwargs.get("number_format"):
+            format_options = kwargs["number_format"]
+            Style.set_number_format(self.worksheet, format_options)
         return self
 
     def style_to_cells(self, cells, **kwargs):

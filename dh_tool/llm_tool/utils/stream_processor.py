@@ -120,12 +120,7 @@ class GeminiStreamProcessor:
     ) -> Box:
         collected_text = ""  # 최종 합쳐질 텍스트
         last_candidate = None  # 마지막 candidate 저장
-        usage_metadata = {
-            "prompt_token_count": 0,
-            "total_token_count": 0,
-            "cached_content_token_count": 0,
-            "candidates_token_count": 0,
-        }
+        lsat_usage_metadata = {}  # 마지막 usage_metadata 저장
         combined_safety_ratings = []  # safety_ratings을 누적 저장
         combined_grounding_attributions = []  # grounding_attributions 누적 저장
         total_token_count = 0  # token_count 누적
@@ -138,11 +133,7 @@ class GeminiStreamProcessor:
             print(text, end="", flush=True) if verbose else None
 
             last_candidate = chunk["candidates"][0]  # 마지막 응답을 저장
-
-            # usage_metadata 업데이트 (토큰 개수 합산)
-            for key in usage_metadata.keys():
-                if key in chunk["usage_metadata"]:
-                    usage_metadata[key] += chunk["usage_metadata"][key]
+            lsat_usage_metadata = chunk.get("usage_metadata", {})  # usage_metadata 추출
 
             # safety_ratings 합치기 (리스트 병합)
             if "safety_ratings" in last_candidate:
@@ -179,7 +170,7 @@ class GeminiStreamProcessor:
         # 최종 응답 객체 생성
         complete_response = {
             "candidates": [merged_candidate],
-            "usage_metadata": usage_metadata,
+            "usage_metadata": lsat_usage_metadata,
         }
 
         return Box(complete_response)  # Box 객체로 반환
