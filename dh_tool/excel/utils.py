@@ -6,31 +6,72 @@ import string
 import colorsys
 
 
-def generate_color_variants(hex_color, steps=10, lightness_factor=0.1):
+def hex_to_argb(hex_color):
     """
-    주어진 HEX 색상에서 명도를 조정하여 steps 단계의 색상 리스트 생성
-    - lightness_factor: 명도 변화의 정도 (0.1 ~ 0.3 추천)
+    HEX 색상 (#RRGGBB) → ARGB (FFRRGGBB) 변환
     """
     hex_color = hex_color.lstrip("#")  # '#' 제거
-    r, g, b = tuple(
-        int(hex_color[i : i + 2], 16) / 255.0 for i in (0, 2, 4)
-    )  # 0~1 범위 변환
-    h, l, s = colorsys.rgb_to_hls(r, g, b)  # RGB → HSL 변환
+    if len(hex_color) != 6:
+        raise ValueError("HEX 색상 코드는 6자리여야 합니다 (#RRGGBB).")
 
-    # 💡 기존 명도를 중심으로 약간씩 조정
-    min_lightness = max(0.2, l - lightness_factor)  # 기존 l보다 살짝 어둡게
-    max_lightness = min(0.95, l + lightness_factor)  # 기존 l보다 살짝 밝게
+    return f"09{hex_color.upper()}"  # 불투명 Alpha(FF) 추가
+
+
+def generate_color_variants(argb_color, steps=10, lightness_factor=0.1):
+    """
+    주어진 ARGB 색상(AARRGGBB)에서 명도를 조정하여 steps 단계의 색상 리스트 생성
+    - steps: 색상 단계 개수
+    - lightness_factor: 명도 변화 정도 (0.1 ~ 0.3 추천)
+    - 결과: "AARRGGBB" 형식의 리스트 반환
+    """
+    if len(argb_color) != 8:
+        raise ValueError("ARGB 색상 코드는 8자리(AARRGGBB)여야 합니다.")
+
+    alpha = argb_color[:2]  # Alpha 값 유지
+    r, g, b = tuple(int(argb_color[i : i + 2], 16) / 255.0 for i in (2, 4, 6))
+    h, l, s = colorsys.rgb_to_hls(r, g, b)  # RGB → HLS 변환
+
+    # 명도 범위 설정 (너무 밝거나 어둡지 않게 조정)
+    min_lightness = max(0.2, l - lightness_factor)  # 기존 l보다 어둡게
+    max_lightness = min(0.95, l + lightness_factor)  # 기존 l보다 밝게
 
     variants = []
     for i in range(steps):
         new_l = min_lightness + (max_lightness - min_lightness) * (
             i / (steps - 1)
         )  # 선형 보간
-        new_r, new_g, new_b = colorsys.hls_to_rgb(h, new_l, s)  # HSL → RGB 변환
-        new_hex = f"FF{int(new_r*255):02X}{int(new_g*255):02X}{int(new_b*255):02X}"  # ARGB 변환
-        variants.append(new_hex)
+        new_r, new_g, new_b = colorsys.hls_to_rgb(h, new_l, s)  # HLS → RGB 변환
+        new_argb = f"{alpha}{int(new_r*255):02X}{int(new_g*255):02X}{int(new_b*255):02X}"  # Alpha 유지
+        variants.append(new_argb)
 
     return variants
+
+
+# def generate_color_variants(hex_color, steps=10, lightness_factor=0.1):
+#     """
+#     주어진 HEX 색상에서 명도를 조정하여 steps 단계의 색상 리스트 생성
+#     - lightness_factor: 명도 변화의 정도 (0.1 ~ 0.3 추천)
+#     """
+#     hex_color = hex_color.lstrip("#")  # '#' 제거
+#     r, g, b = tuple(
+#         int(hex_color[i : i + 2], 16) / 255.0 for i in (0, 2, 4)
+#     )  # 0~1 범위 변환
+#     h, l, s = colorsys.rgb_to_hls(r, g, b)  # RGB → HSL 변환
+
+#     # 💡 기존 명도를 중심으로 약간씩 조정
+#     min_lightness = max(0.2, l - lightness_factor)  # 기존 l보다 살짝 어둡게
+#     max_lightness = min(0.95, l + lightness_factor)  # 기존 l보다 살짝 밝게
+
+#     variants = []
+#     for i in range(steps):
+#         new_l = min_lightness + (max_lightness - min_lightness) * (
+#             i / (steps - 1)
+#         )  # 선형 보간
+#         new_r, new_g, new_b = colorsys.hls_to_rgb(h, new_l, s)  # HSL → RGB 변환
+#         new_hex = f"FF{int(new_r*255):02X}{int(new_g*255):02X}{int(new_b*255):02X}"  # ARGB 변환
+#         variants.append(new_hex)
+
+#     return variants
 
 
 def map_column_names_to_letters(worksheet, width_map):
