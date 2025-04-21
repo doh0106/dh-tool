@@ -3,7 +3,7 @@ from box import Box
 from typing import AsyncIterator, Dict, Any
 import itertools
 
-from ..utils.response_parser import parse_gemini_response, parse_openai_response
+# from ..utils.response_parser import parse_gemini_response, parse_openai_response
 
 
 class AsyncStreamProcessorInterface(ABC):
@@ -66,111 +66,58 @@ from typing import AsyncIterator, Dict, Any
 from box import Box
 
 
-# class GeminiStreamProcessor:
-#     @staticmethod
-#     async def process_stream(
-#         stream_output: AsyncIterator[Dict[str, Any]], verbose: bool
-#     ) -> Box:
-#         collected_text = ""  # 최종 합쳐질 텍스트
-#         last_candidate = None  # 마지막 candidate 저장
-#         usage_metadata = {
-#             "prompt_token_count": 0,
-#             "total_token_count": 0,
-#             "cached_content_token_count": 0,
-#             "candidates_token_count": 0,
-#         }
-
-#         async for chunk in stream_output:
-#             # 텍스트 추출 및 합치기
-#             chunk = chunk.to_dict()
-#             text = chunk["candidates"][0]["content"]["parts"][0]["text"]
-#             collected_text += text
-#             print(text, end="", flush=True) if verbose else None
-
-#             last_candidate = chunk["candidates"][0]  # 마지막 응답을 저장
-
-#             # usage_metadata 업데이트 (토큰 개수 합산)
-#             for key in usage_metadata.keys():
-#                 if key in chunk["usage_metadata"]:
-#                     usage_metadata[key] += chunk["usage_metadata"][key]
-
-#         # 최종 후보자(candidates) 생성
-#         merged_candidate = {
-#             "content": {"parts": [{"text": collected_text}], "role": "model"},
-#             "finish_reason": last_candidate["finish_reason"],
-#             "safety_ratings": last_candidate["safety_ratings"],
-#             "token_count": last_candidate["token_count"],
-#             "grounding_attributions": last_candidate["grounding_attributions"],
-#             "avg_logprobs": last_candidate["avg_logprobs"],
-#         }
-
-#         # 최종 응답 객체 구성
-#         complete_response = {
-#             "candidates": [merged_candidate],
-#             "usage_metadata": usage_metadata,
-#         }
-
-#         return Box(complete_response)  # Box로 감싸서 반환
+from google.genai.types import GenerateContentResponse
 
 
 class GeminiStreamProcessor:
     @staticmethod
-    async def process_stream(
-        stream_output: AsyncIterator[Dict[str, Any]], verbose: bool
-    ) -> Box:
-        collected_text = ""  # 최종 합쳐질 텍스트
-        last_candidate = None  # 마지막 candidate 저장
-        lsat_usage_metadata = {}  # 마지막 usage_metadata 저장
-        combined_safety_ratings = []  # safety_ratings을 누적 저장
-        combined_grounding_attributions = []  # grounding_attributions 누적 저장
-        total_token_count = 0  # token_count 누적
-        avg_logprobs = []  # logprobs를 모아 평균 계산
+    async def process_stream(stream_output: AsyncIterator[Any], verbose: bool) -> Box:
+        valid_fields = set(GenerateContentResponse.model_fields.keys())
+
+        collected_text = ""
+        last_candidate = None
+        last_usage_metadata = {}
+        combined_values = {field: [] for field in valid_fields if field != "content"}
 
         async for chunk in stream_output:
-            chunk = chunk.to_dict()
-            text = chunk["candidates"][0]["content"]["parts"][0]["text"]
+            if not isinstance(chunk, Box):
+                chunk = Box(chunk)
+
+            text = getattr(chunk.candidates[0].content.parts[0], "text", "")
             collected_text += text
-            print(text, end="", flush=True) if verbose else None
+            if verbose:
+                print(text, end="", flush=True)
 
-            last_candidate = chunk["candidates"][0]  # 마지막 응답을 저장
-            lsat_usage_metadata = chunk.get("usage_metadata", {})  # usage_metadata 추출
+            last_candidate = chunk.candidates[0]
+            last_usage_metadata = getattr(chunk, "usage_metadata", {})
 
-            # safety_ratings 합치기 (리스트 병합)
-            if "safety_ratings" in last_candidate:
-                combined_safety_ratings.extend(last_candidate["safety_ratings"])
+            for field in valid_fields:
+                if field == "content":
+                    continue
+                value = getattr(last_candidate, field, None)
+                if value is not None:
+                    if isinstance(value, list):
+                        combined_values[field].extend(value)
+                    else:
+                        combined_values[field].append(value)
 
-            # grounding_attributions 합치기 (리스트 병합)
-            if "grounding_attributions" in last_candidate:
-                combined_grounding_attributions.extend(
-                    last_candidate["grounding_attributions"]
-                )
-
-            # token_count 합산
-            total_token_count += last_candidate.get("token_count", 0)
-
-            # avg_logprobs 값 추가 (평균 계산을 위해 리스트로 저장)
-            if "avg_logprobs" in last_candidate:
-                avg_logprobs.append(last_candidate["avg_logprobs"])
-
-        # avg_logprobs 평균 계산
-        avg_logprobs_value = (
-            sum(avg_logprobs) / len(avg_logprobs) if avg_logprobs else 0.0
-        )
-
-        # 최종 후보자(candidates) 생성
         merged_candidate = {
-            "content": {"parts": [{"text": collected_text}], "role": "model"},
-            "finish_reason": last_candidate["finish_reason"],
-            "safety_ratings": combined_safety_ratings,
-            "token_count": total_token_count,
-            "grounding_attributions": combined_grounding_attributions,
-            "avg_logprobs": avg_logprobs_value,
+            "content": {"parts": [{"text": collected_text}], "role": "model"}
         }
 
-        # 최종 응답 객체 생성
+        for field, values in combined_values.items():
+            if values:
+                if field == "avg_logprobs":
+                    merged_candidate[field] = sum(values) / len(values)
+                elif field == "token_count":
+                    merged_candidate[field] = sum(values)
+                else:
+                    merged_candidate[field] = values
+
         complete_response = {
             "candidates": [merged_candidate],
-            "usage_metadata": lsat_usage_metadata,
+            "usage_metadata": last_usage_metadata,
+            "text": collected_text,
         }
 
-        return Box(complete_response)  # Box 객체로 반환
+        return Box(complete_response)
