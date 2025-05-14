@@ -1,7 +1,8 @@
 # dh_tool/llm_tool/llm/base.py
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
+import inspect
+from typing import Dict, Any, Optional
 
 
 @dataclass
@@ -36,6 +37,31 @@ class BaseLLM(ABC):
         self._get_allowed_params()
         self._parse_config()
         self._setup_client()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        try:
+            # Case 1: OpenAI - AsyncOpenAI client
+            if hasattr(self._client, "close") and inspect.iscoroutinefunction(
+                self._client.close
+            ):
+                await self._client.close()
+
+            # Case 2: Google GenAI - aio path
+            elif hasattr(self._client, "aio"):
+                aio = self._client.aio
+                httpx_client = getattr(
+                    getattr(aio, "_api_client", None), "_async_httpx_client", None
+                )
+                if httpx_client and inspect.iscoroutinefunction(httpx_client.aclose):
+                    await httpx_client.aclose()
+            else:
+                print("[BaseLLM] Client does not support async close. Skipping.")
+
+        except Exception as e:
+            print(f"[BaseLLM] Failed to close client: {e}")
 
     @abstractmethod
     def _get_allowed_params(self) -> None:
